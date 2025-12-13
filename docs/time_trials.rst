@@ -80,22 +80,37 @@ Summary
 Key Observations
 ----------------
 
-**Trials 1 & 2 - Garage Heading Failure**:
+**Trials 1 & 2 - Checkpoint 4 Failure**:
 
-Both early trials failed entering the parking garage at checkpoint 4:
+Both early trials failed at checkpoint 4 (garage entry):
 - Heading control unstable in narrow corridor
-- Robot either:
-  - Lost heading and wandered off-line into wall, OR
-  - Overcorrected and drove straight into wall
-- Failed before ever reaching the garage exit (CP 5)
-- Indicates systematic heading stability problem in tight spaces
+- Robot drifted into wall or overcorrected into opposite wall
+- Never reached checkpoint 5
+- Consistent failure point indicates systematic control issue at this location
 
-**Trial 3 - Complete Success**:
+**Trial 3 - Same Code, Different Outcome**:
 
-Successfully navigated:
-- Parking garage (CP 4 → CP 5): Maintained heading in narrow corridor
-- Wall interaction (CP 5 → CP 6): Handled final approach cleanly
-- Full course completion in 165.72 seconds
+Trial 3 **also uses the same code** but managed to:
+- Pass checkpoint 4 (barely)
+- Reach checkpoint 5 (garage exit)
+- Complete checkpoint 6 (wall interaction)
+- **But this is NOT due to code fixes - the problem persists**
+
+**Why Trial 3 Succeeded When 1 & 2 Failed**:
+
+With identical code, the difference must be:
+- **Luck/Timing**: Random initial conditions (heading, motor state) happened to work
+- **Environmental Factors**: Different floor friction, temperature, or sensor calibration
+- **Margin of Safety**: The code barely works - Trials 1 & 2 hit the wall, Trial 3 threaded the needle
+- **Non-Deterministic Behavior**: The same code sometimes works, sometimes fails
+
+**Critical Issue**:
+
+The checkpoint 4 problem is **NOT FIXED**. The code is **unreliable** because:
+- Same code fails 2/3 times (Trials 1 & 2)
+- Same code passes 1/3 times (Trial 3)
+- Success appears to depend on chance, not code quality
+- Future runs will likely fail again at checkpoint 4
 
 **Cups (Bonuses)**:
 
@@ -107,40 +122,57 @@ No cups were collected in any trial:
 Failure Analysis
 ----------------
 
-**Trials 1 & 2: Parking Garage Entry Failure**
+**Checkpoint 4: The Unresolved Problem**
 
-The parking garage entry (checkpoint 3 → 4) is a tight corridor requiring:
-- Precise heading maintenance (180° constant)
-- No heading drift tolerance in narrow space
-- Smooth heading control without oscillation
+Trials 1 & 2 failed at checkpoint 4 (garage entry). Trial 3 used the **same code** but didn't fail - this means:
 
-**Why It Failed**:
+1. **The Problem Wasn't Fixed**: No code changes were made between trials
+2. **The Code is Unreliable**: It fails sometimes, passes sometimes, with identical logic
+3. **Chance, Not Quality**: Trial 3 likely succeeded by luck - slightly different initial conditions or timing
+4. **Will Fail Again**: Future runs using this code will probably fail at checkpoint 4 again
 
-The garage is bounded by walls on both sides. The robot either:
-1. **Understeered**: Drifted left/right and made contact with wall
-2. **Oversteered**: Overcorrected heading and drove straight into wall
-3. **Lost Control**: Integral wind-up caused oscillation, hit wall multiple times
+**What's Actually Happening at Checkpoint 4**:
 
-The fact that both Trial 1 & 2 failed at the same point (before CP 5) confirms the issue is heading control in the garage segment, not the wall interaction sequence.
+The garage entry (CP 4) requires precise heading control in a narrow corridor. The code's heading control strategy:
+- Either drifts too much (hits wall)
+- Or corrects too aggressively (oscillates and hits opposite wall)
+- Or sometimes finds the balance purely by chance
 
-**Resolution** (Trial 3):
+**Why Trial 3 Succeeded**:
 
-- Increased heading tolerance to allow slight drift without aggressive correction
-- Added adaptive bias only if drift > 8° (prevents over-correction)
-- Improved motor conflict resolution
-- Better integral term handling in control loops
+Possible explanations (all non-code-related):
+- Robot started with slightly better heading alignment
+- Motor friction was different that attempt
+- Floor conditions were different
+- Timing of heading corrections happened to work out
+- Pure chance - the robot threaded the needle
 
-Performance Improvements
-------------------------
+**Root Cause**: The heading control algorithm fundamentally can't reliably navigate the tight garage corridor. The code needs redesign, not just tuning.
+
+Performance Problems
+-------------------
 
 From Trial 1 to Trial 3:
 
-- **Garage Entry**: DNF at 94.85s → Passed at 100.53s ✓
-- **Garage Completion**: Never reached CP 5 → Reached at 123.93s ✓
-- **Wall Interaction**: Never attempted → Completed at 165.72s ✓
-- **Code Changes**: Focus on garage heading control and motor balance
+- **Trial 1**: Failed at CP 4 (heading control lost)
+- **Trial 2**: Failed at CP 4 (same heading control issue)
+- **Trial 3**: Passed CP 4 by chance, but code is still broken
 
-This shows the garage segment (CP 4→5) is the critical bottleneck - once that's solved, the wall interaction (CP 5→6) proceeds smoothly.
+**No Actual Improvements**:
+
+- No code changes between trials
+- Same heading control algorithm
+- Same motor balance issues
+- Trial 3 success is luck, not improvement
+- **Expected next run**: Likely to fail at CP 4 again
+
+**The Real Issue**:
+
+The checkpoint 4 garage problem is **not solved**. The code needs:
+- Fundamentally different heading control strategy
+- Better motor symmetry handling
+- Wider tolerance or different approach to narrow corridors
+- Redesign, not tuning
 
 Timing Breakdown
 ----------------
