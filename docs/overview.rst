@@ -2,7 +2,7 @@ Overview
 ========
 
 .. image:: /images/romi_isometric.png
-   :width: 400px
+   :width: 600px
    :align: center
 
 Project Summary
