@@ -1,9 +1,6 @@
 Tasks
 =====
 
-Task Overview
--------------
-
 The system uses 8 concurrent tasks scheduled at different priorities and periods:
 
 Serial Task (150ms)
