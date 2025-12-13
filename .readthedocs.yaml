@@ -19,9 +19,3 @@ sphinx:
 python:
   install:
     - requirements: docs/requirements.txt
-```
-
-Then create `docs/requirements.txt` with:
-```
-sphinx>=7.0
-sphinx-rtd-theme
