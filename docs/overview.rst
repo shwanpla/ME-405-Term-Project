@@ -10,6 +10,8 @@ Project Summary
 
 This documentation covers the complete design and implementation of an **autonomous obstacle course navigation system** for a Romi robot using the NUCLEO-L476RG microcontroller.
 
+**Repository**: `Romi Navigation GitHub <https://github.com/YOUR_USERNAME/romi-navigation>`_
+
 The robot autonomously navigates a 24-state obstacle course using:
 
 - **Encoder-based odometry** for distance and heading tracking
