@@ -4,7 +4,7 @@ Tasks
 The system uses 8 concurrent tasks scheduled at different priorities and periods:
 
 Serial Task (150ms)
-===================
+~~~~~~~~~~~~~~~~~~~
 
 **Purpose**: Bluetooth communication and configuration
 
@@ -21,6 +21,7 @@ Serial Task (150ms)
     [CALIBRATION_COMPLETE] → [Start Navigation] → [Monitor for END_COMM]
 
 Motor Control Tasks (12ms period)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ==================================
 
 **Left/Right Motor Control** (2 tasks)
@@ -41,6 +42,7 @@ Motor Control Tasks (12ms period)
                             └────────────[Feedback]─────────────────┘
 
 Closed-Loop Control Tasks (20ms period)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ========================================
 
 **Left/Right CL Control** (2 tasks)
@@ -65,6 +67,7 @@ Closed-Loop Control Tasks (20ms period)
     [force_straight_flg] ─→ [Disable Line Bias]
 
 Encoder Heading Task (50ms period)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ===================================
 
 **Purpose**: Calculate robot heading and distance from encoders
@@ -84,6 +87,7 @@ Encoder Heading Task (50ms period)
                    ├─→ [Distance Accumulation] ─→ [Total Distance]
 
 Navigation Task (50ms period)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 =============================
 
 **Purpose**: 24-state obstacle course state machine
@@ -116,6 +120,7 @@ Navigation Task (50ms period)
 - **Recovery Sequence**: 16-23 (7 states for wall escape)
 
 Bump Sensor Task (20ms period)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ==============================
 
 **Purpose**: Monitor collision sensor
@@ -133,6 +138,7 @@ Bump Sensor Task (20ms period)
                    [Navigation detects] ─→ [Enters STATE 16]
 
 Task Interactions
+~~~~~~~~~~~~~~~~~~
 =================
 
 The tasks communicate via shared memory (task_share):
@@ -178,6 +184,7 @@ The tasks communicate via shared memory (task_share):
      - Target heading
 
 Task Timing
+~~~~~~~~~~~~
 ===========
 
 The scheduler runs at ~1kHz. Task periods:
