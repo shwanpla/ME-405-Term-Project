@@ -11,7 +11,8 @@ Motors
 
 - **Left/Right DC Motors** with 30 kHz PWM (Timer 3)
 - Motor driver control via GPIO pins (H-bridge)
-- Bidirectional speed control (-100 to +100 mm/s)
+- Bidirectional speed control (-745 to +745 mm/s)
+- *NOTE:** Motor speed is limited at 745 mm/s as one motor was 100mm/s faster than the other.
 
 Encoders
 --------
