@@ -1,4 +1,4 @@
-Romi Autonomous Navigation
+ME 405 Term Project
 ===========================
 
 .. toctree::
