@@ -8,9 +8,9 @@ import sys
 sys.path.insert(0, os.path.abspath('../src'))
 
 # --- Project information -----------------------------------------------------
-project = 'Romi Autonomous Navigation'
-author = 'ME 405 Team'
-copyright = '2024'
+project = 'ME 405 Term Project - Romi Navigation'
+author = 'Billy Hawkins, Tarsem Pal, and Arturo Ramirez'
+copyright = '2025'
 release = '1.0.0'
 
 # --- General configuration ---------------------------------------------------
