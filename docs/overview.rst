@@ -1,7 +1,7 @@
 Overview
 ========
 
-.. image:: /images/romi_robot.png
+.. image:: /images/romi_isometric.png
    :width: 400px
    :align: center
 
