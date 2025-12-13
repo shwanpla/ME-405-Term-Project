@@ -3,29 +3,46 @@
 import os
 import sys
 
-# Add the source directory to path
-sys.path.insert(0, os.path.abspath('.'))
+# --- Path setup --------------------------------------------------------------
+# Point Sphinx to your source code directory (MicroPython modules live here)
+sys.path.insert(0, os.path.abspath('../src'))
 
+# --- Project information -----------------------------------------------------
 project = 'Romi Autonomous Navigation'
-copyright = '2024'
 author = 'ME 405 Team'
+copyright = '2024'
 release = '1.0.0'
 
+# --- General configuration ---------------------------------------------------
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
     'sphinx.ext.mathjax',
-    'sphinx_rtd_theme',
 ]
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+# MicroPython modules do not exist on CPython,
+# so we mock them so autodoc can import your files.
+autodoc_mock_imports = [
+    'pyb',
+    'machine',
+    'micropython',
+    'utime',
+    'uos',
+    'ujson',
+    'time',
+]
+
+# The master file (index)
+master_doc = 'index'
+
+# --- HTML output -------------------------------------------------------------
 html_theme = 'sphinx_rtd_theme'
-html_static_path = [] 
+html_static_path = []  # You can add custom CSS later if desired
+
 html_theme_options = {
     'github_user': 'shwanpla',
     'github_repo': 'ME-405-Term-Project',
 }
-
-master_doc = 'index'  
