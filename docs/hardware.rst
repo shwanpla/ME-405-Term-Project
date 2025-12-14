@@ -150,7 +150,7 @@ A Pololu QTR reflectance sensor array provides line detection and lateral error 
    * - Custom mounting fixture
      - Maintains repeatable sensor height and alignment relative to the floor
 
-.. image:: /images/qtr_array.png
+.. image:: /images/IR_sensor_image.png
    :width: 800px
    :align: center
 
