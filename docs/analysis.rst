@@ -1,237 +1,98 @@
 Analysis
 ========
 
-Performance Metrics
--------------------
+Bluetooth Telemetry and Line Following Breakthrough
+===================================================
 
-Navigation Accuracy
-~~~~~~~~~~~~~~~~~~~
+A key capability that accelerated our progress was real time introspection of the running firmware. After integrating the Bluetooth module, we streamed structured REPL output to a PC using PuTTY while Romi executed its cooperative tasks. This gave us continuous visibility into internal variables such as encoder velocity, PI error, integrator state, line centroid, saturation status, and scheduler state flags. With that visibility, each trial became a measurable experiment. We could confirm timing behavior, detect mode transitions, validate that calibration was applied correctly, and save full text logs for offline plotting and direct comparison across runs.
 
-**Heading Stability**:
+From there, we focused on the most control intensive milestone of the term: stable line following with the 7 channel Pololu QTR array. The program treats line tracking as a closed loop regulation problem driven by a centroid measurement computed from the reflectance profile. Each sample produces a normalized set of sensor intensities, a centroid location across the array, and a signed lateral error relative to the center sensor. That error is then converted into a steering correction which is injected into the motor effort commands while the underlying velocity loop maintains repeatable forward speed.
 
-- Line following sections: ±3° (acceptable for turns)
-- Straight sections: ±1.5° (tight control)
-- Recovery sequence: ±2° (loose tolerance allows faster transitions)
+Control and sensing were implemented explicitly in the code using the following sequence of computations.
 
-**Distance Tracking**:
+IR calibration and normalization
+-------------------------------
 
-- Encoder resolution: ~0.1mm per tick
-- Encoder-based distance accumulates <1% error per 1000mm
-- Accuracy sufficient for state transitions
+Calibration establishes two reference measurements for each channel, one for white background and one for black tape. During runtime, each raw reading is mapped into a normalized intensity so the centroid calculation remains consistent across lighting variation and across repeated trials.
 
-**State Transition Success**:
+.. math::
 
-- Main course (States 0-15): >95% first-try success
-- Recovery sequence (States 16-23): >90% success
-- Most failures are timeout-related, not sensor failures
+   I_i = \mathrm{clip}\!\left(\frac{R_i - W_i}{B_i - W_i},\,0,\,1\right)
 
-Motor Performance
-~~~~~~~~~~~~~~~~~
+where :math:`R_i` is the raw sensor reading for channel :math:`i`, :math:`W_i` is the white reference, :math:`B_i` is the black reference, and :math:`I_i` is the normalized intensity used for line tracking.
 
-**Velocity Regulation**:
-
-- Setpoint: 50 mm/s
-- Steady-state error: <2 mm/s
-- Response time: ~100ms to setpoint
-- Max overshoot: 5%
-
-**Motor Symmetry**:
-
-- Left/right effort difference: <10% in straights
-- Heading control maintains <5° drift
-- Both motors fire equally in force_straight mode
-
-Task Scheduling
-~~~~~~~~~~~~~~~
-
-**Timing Performance**:
-
-- Motor control: 12ms (meets deadline)
-- CL control: 20ms (meets deadline)
-- Navigation: 50ms (meets deadline)
-- Encoder: 50ms (meets deadline)
-- Serial: 150ms (I/O bound, adequate)
-
-**CPU Utilization**:
-
-- Estimated <40% of NUCLEO capacity
-- No task starvation observed
-- Bump sensor polling reliable
-
-Sensor Performance
-~~~~~~~~~~~~~~~~~~
-
-**IR Line Sensors**:
-
-- Calibration range: 500-2500 (black-white)
-- Noise margin: ~200 counts (robust)
-- Update rate: Every CL control cycle (20ms)
-- Bias calculation: Weighted average of left/right sensors
-
-**Encoders**:
-
-- Resolution: ~0.1mm per count (high resolution)
-- No missed pulses observed
-- Accumulation error: <0.1% over course length
-
-**Bump Sensor**:
-
-- Response time: <20ms
-- Reliable collision detection in all tested orientations
-- No false positives observed
-
-Course Navigation Times
+Centroid and line error
 -----------------------
 
-**Main Course** (States 0-15):
+The centroid represents the weighted location of the detected line across the array. With seven sensors indexed left to right, the centroid is computed as:
 
-- Distance: ~4474mm
-- Time: ~90-100 seconds
-- Average speed: ~45-50 mm/s
+.. math::
 
-**Recovery Sequence** (States 16-23):
+   c = \frac{\sum_{i=1}^{7} p_i I_i}{\sum_{i=1}^{7} I_i}
 
-- Distance: ~650mm (backup + forward)
-- Time: ~15-20 seconds
-- Success rate: >85%
+where :math:`p_i` are the sensor position weights. The signed line error is then formed relative to the desired center position :math:`c_0`:
 
-**Total Run** (Complete course):
+.. math::
 
-- With collision: ~110-130 seconds
-- Without collision: ~90-100 seconds
-- Repeatability: ±5 seconds
+   e_\mathrm{line} = c - c_0
 
-Error Analysis
---------------
+This single scalar error gives the controller a continuous measure of how far the line is from the center of the array, with sign indicating which direction the robot must steer to re center.
 
-**Common Failure Modes**:
+Velocity PI control and steering injection
+------------------------------------------
 
-1. **Heading Overshoot on Turns** (5% of runs)
-   - Cause: Turning states have 9-11° tolerance
-   - Effect: Enters straight 5-10° off
-   - Recovery: Motor PID corrects within 500ms
-   - Fix: Could reduce tolerance further but speed cost
+Each wheel is regulated using a PI velocity controller driven by encoder speed feedback. The core loop follows:
 
-2. **Late State Transitions** (<2% of runs)
-   - Cause: Distance threshold slightly optimistic
-   - Effect: Overshoots by 10-50mm
-   - Recovery: Next state usually compensates
-   - Fix: Not practical - course distances vary ±50mm
+.. math::
 
-3. **Asymmetric Motor Behavior** (3% of runs)
-   - Cause: Mechanical slack or bearing friction
-   - Effect: Heading drift in long straights
-   - Recovery: force_straight_flg corrects via PID
-   - Fix: Mechanical maintenance
+   e_v(t) = v_\mathrm{ref}(t) - v(t)
 
-4. **Bump Sensor Triggered Unexpectedly** (<1% of runs)
-   - Cause: Vibration or contact with wall lip
-   - Effect: Initiates recovery mid-straight
-   - Recovery: Sequence usually successful
-   - Fix: Sensor tuning (noise filtering)
+.. math::
 
-Energy Consumption
--------------------
+   u_\mathrm{PI}(t) = K_p e_v(t) + K_i \int e_v(t)\,dt
 
-**Motor Duty Cycle**:
+The line following correction is implemented as an additive differential term that biases left and right effort in opposite directions:
 
-- Idle: 0% (motors off in states)
-- Active navigation: 50-80% (variable velocity)
-- Recovery sequence: 100% (maximum effort)
+.. math::
 
-**Power Draw**:
+   \Delta u_\mathrm{line}(t) = K_\ell e_\mathrm{line}(t) + K_{\ell i}\int e_\mathrm{line}(t)\,dt
 
-- Idle: ~50mA (MCU + sensors)
-- Running: ~500mA (motors active)
-- Peak (recovery): ~800mA (both motors max)
+.. math::
 
-**Battery Life**:
+   u_L(t) = \mathrm{sat}\!\left(u_\mathrm{PI}(t) - \Delta u_\mathrm{line}(t)\right), \quad
+   u_R(t) = \mathrm{sat}\!\left(u_\mathrm{PI}(t) + \Delta u_\mathrm{line}(t)\right)
 
-- Typical 2S LiPo (1200mAh): ~5-10 runs
-- Run duration: ~2 minutes per cycle
-- Voltage drop significant after 6+ runs (performance degradation)
+where :math:`u_L` and :math:`u_R` are the left and right motor effort commands and :math:`\mathrm{sat}(\cdot)` enforces the allowable effort range. This structure makes the behavior interpretable during tuning because the forward speed is controlled by the velocity loop while lateral correction is controlled by the centroid error terms.
 
-Heading Drift Analysis
-----------------------
+Integrator management and repeatability
+---------------------------------------
 
-**Root Causes of Drift**:
+To maintain stability across aggressive maneuvers, the program tracks saturation and constrains integral accumulation when the output is pinned at its limit. This prevents integrator growth from dominating the response after the robot reacquires the line. The same philosophy is applied to the line integral term so that line correction remains smooth rather than accumulating a large bias during temporary loss of contrast.
 
-1. **Motor Friction Asymmetry** (~60% of drift)
-   - Left motor slightly stiffer
-   - Causes consistent left bias
-   - Corrected by proportional feedback
+Tuning workflow and physical validation
+---------------------------------------
 
-2. **Encoder Count Asymmetry** (~25% of drift)
-   - Wheel slip on acceleration
-   - Uneven surface contact
-   - Corrected by accumulated difference
+At this phase of the term, most iteration time was spent converting these computations into reliable physical performance. We tuned :math:`K_p` and :math:`K_i` for stable speed tracking, then tuned :math:`K_\ell` and :math:`K_{\ell i}` so the robot continuously re centered on the tape without oscillation, overshoot, or drift. Each trial around the black circle was evaluated using the telemetry stream and direct observation. We looked for the same signatures in the data every run: bounded line error, stable encoder speed, limited saturation time, and consistent centroid convergence after disturbances. Once the robot could follow the circle repeatedly, we had a validated sensing and control foundation that supported the later navigation logic used on the obstacle course.
 
-3. **Sensor Noise** (~15% of drift)
-   - IR sensor jitter
-   - Encoder noise at transitions
-   - Filtered by PI gains
+.. image:: /images/team_line_follow_tuning.png
+   :width: 900px
+   :align: center
 
-**Mitigation Strategies**:
+.. centered::
+   *Our team during the line following tuning phase, using live PuTTY telemetry and repeated trials to refine calibration, gains, and stability margins.*
 
-- force_straight_flg disables competing bias
-- PID proportional gain (Kp) provides aggressive correction
-- Integral term prevents steady-state error
-- 50ms encoder update rate adequate for 50mm/s speed
+.. raw:: html
 
-State Transition Analysis
--------------------------
+   <div style="display:flex; justify-content:center; margin-top:10px; margin-bottom:10px;">
+     <div style="width:100%; max-width:720px; aspect-ratio:16/9;">
+       <iframe src="https://www.youtube.com/embed/VIDEO_ID"
+               title="Initial Line Following Breakthrough"
+               style="width:100%; height:100%; border:0;"
+               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+               allowfullscreen>
+       </iframe>
+     </div>
+   </div>
 
-**Smooth Transitions**:
-
-- Turn → Straight: Instant heading capture (0ms delay)
-- Straight → Turn: Direct state change (0ms delay)
-- Line Follow → Straight: Bias reset immediate
-- Straight → Line Follow: ~20ms for bias to stabilize
-
-**Problem Transitions**:
-
-- STATE 13 (garage straight) sometimes veers
-  - Solution: Heading error check with 8° threshold
-  - Applies corrective bias if drift detected
-  - Prevents oscillation while allowing self-correction
-
-- STATE 18 (recovery straight) had motor imbalance
-  - Original problem: Dynamic bias updates conflicted
-  - Solution: Static bias=0.0 during recovery
-  - Motor control PID handles all corrections
-
-Optimization Opportunities
---------------------------
-
-**Not Pursued** (marginal value):
-
-- Reduce STATE transition tolerance further (speed cost >benefit)
-- Increase encoder update rate (50ms sufficient for speed)
-- Add predictive state transitions (not needed for known course)
-- Implement limp-home mode on sensor failure (course-specific)
-
-**Could Improve** (if revisited):
-
-- Bump sensor noise filtering (false positives rare)
-- Adaptive motor gains by battery voltage (would need voltage measurement)
-- Terrain compensation (surface friction variation)
-- Temperature compensation for sensors
-
-Robustness
-----------
-
-**Tested Scenarios**:
-
-- ✓ Uneven floor (±5mm height variation)
-- ✓ Lighting changes (IR calibration handles it)
-- ✓ Obstacles at odd angles
-- ✓ Motor friction variation
-- ✓ Multiple recovery sequences in one run
-- ✓ Partial collisions (one side bumps)
-
-**Untested Scenarios**:
-
-- Low battery voltage (<3V on 2S LiPo)
-- Extreme motor friction
-- Wet/muddy floor
-- Temperature extremes (<0°C or >40°C)
+.. centered::
+   *First stable line following breakthrough demonstrating centroid based tracking with PI velocity regulation and continuous steering correction.*
