@@ -3,8 +3,6 @@ ME 405 - Mechatronics
 
 Authors: Billy Hawkins, Tarsem Pal, Arturo Ramirez
 
-Filename: battery_adc.py
-
 Description:
     Battery voltage monitoring module using ADC (Analog-to-Digital Converter).
     Reads voltage directly from pin PC0 with configurable averaging and sampling.
