@@ -31,6 +31,13 @@ Chassis and Drivetrain
 
 Romi uses a Pololu Romi differential drive chassis that integrates the mechanical structure, drive motors, wheels, and encoders with a compact power distribution scheme. This base provides a stable wheelbase for repeatable odometry and closed loop speed control while offering sufficient mounting real estate for sensor placement and cable routing.
 
+.. image:: /images/romi_documentation.png
+   :width: 800px
+   :align: center
+
+.. centered::
+   *Documentation provided by Polulu robotics*
+
 .. list-table:: Chassis and drivetrain elements
    :header-rows: 1
    :widths: 35 65
@@ -53,7 +60,33 @@ Romi uses a Pololu Romi differential drive chassis that integrates the mechanica
 .. centered::
    *Romi chassis and drivetrain assembly used as the mechanical and power foundation for all sensing and control subsystems.*
 
-Embedded Controller
+Power Distribution Board
+------------------------
+
+The power distribution board serves as the electrical hub for Romi, routing battery power to the drivetrain and embedded electronics while providing a clean, repeatable connection point for system bring up and troubleshooting. It reduces wiring complexity by centralizing power and ground distribution, improves serviceability during repeated trials, and supports stable operation when motor loads introduce transients on the supply.
+
+.. list-table:: Power distribution board summary
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Item
+     - Technical role in the system
+   * - Battery input and distribution
+     - Routes supply power to motors and controller wiring harnesses
+   * - Ground reference distribution
+     - Provides a common return path for mixed digital and analog subsystems
+   * - Modular connection points
+     - Simplifies integration, inspection, and rapid hardware iteration
+
+.. image:: /images/pwr_distribution_board.png
+   :width: 750px
+   :align: center
+
+.. centered::
+   *Power distribution board used to centralize battery power and ground routing for the drivetrain and embedded electronics.*
+
+
+Micro-controller Board
 -------------------
 
 The embedded compute core is an STM32 Nucleo board used as the real time MicroPython target. It executes the cooperative task architecture, produces deterministic update timing for sensing and control loops, and exposes the timer, ADC, UART, and GPIO resources required to interface the full hardware stack.
