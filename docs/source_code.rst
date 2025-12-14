@@ -193,3 +193,14 @@ File Sizes
    * - bump_sensor_task.py
      - ~30
      - Collision detection
+
+API Reference
+-------------
+
+Battery ADC Module
+~~~~~~~~~~~~~~~~~~
+
+.. automodule:: battery_adc
+   :members:
+   :undoc-members:
+   :show-inheritance:
