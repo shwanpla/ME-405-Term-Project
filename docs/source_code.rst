@@ -197,6 +197,8 @@ File Sizes
 API Reference
 -------------
 
+This section provides detailed API documentation for each source code module, automatically generated from docstrings in the code. Each module includes class definitions, method signatures, parameters, return types, and usage notes.
+
 Battery ADC Module
 ~~~~~~~~~~~~~~~~~~
 
