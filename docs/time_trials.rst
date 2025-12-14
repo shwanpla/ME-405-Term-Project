@@ -54,6 +54,18 @@ The table below reports our official checkpoint timestamps recorded during the l
      - 165.72
      - No
 
+.. raw:: html
+
+   <div style="text-align:center; margin-top: 10px; margin-bottom: 10px;">
+     <video controls style="max-width: 900px; width: 100%; height: auto;">
+       <source src="_static/successful_run.mp4" type="video/mp4">
+       Your browser does not support the video tag.
+     </video>
+   </div>
+
+.. centered::
+   *Successful full course run recorded during the live time trials demonstration.*
+
 Summary
 -------
 
