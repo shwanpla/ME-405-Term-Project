@@ -83,15 +83,14 @@ At this phase of the term, most iteration time was spent converting these comput
 
 .. raw:: html
 
-   <div style="display:flex; justify-content:center; margin-top:10px; margin-bottom:10px;">
-     <div style="width:100%; max-width:720px; aspect-ratio:16/9;">
-       <iframe src="https://www.youtube.com/embed/VIDEO_ID"
-               title="Initial Line Following Breakthrough"
-               style="width:100%; height:100%; border:0;"
-               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-               allowfullscreen>
-       </iframe>
-     </div>
+   <div style="text-align:center; margin-top: 10px; margin-bottom: 10px;">
+     <iframe width="720" height="405"
+             src="https://www.youtube.com/embed/3hr3dCyPbDM"
+             title="Initial Line Following Breakthrough"
+             frameborder="0"
+             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+             allowfullscreen>
+     </iframe>
    </div>
 
 .. centered::
