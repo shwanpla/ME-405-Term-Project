@@ -26,6 +26,6 @@ The culminating deliverable of the term was a navigation task built specifically
 
 **Repository:**
 
-Firmware and documentation is available on GitHub:
+Firmware and documentation is available on GitHub.
 
 `ME-405-Term-Project repository <https://github.com/shwanpla/ME-405-Term-Project>`_
