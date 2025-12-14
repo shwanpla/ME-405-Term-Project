@@ -1,8 +1,13 @@
 Time Trials
-===========
+==========
+
+The time trials were a live demonstration of Romi’s full system autonomy under official scoring rules, where performance depended on completing the obstacle course reliably across multiple attempts rather than producing a single ideal run. The evaluation emphasized repeatable navigation through constrained track features and decision points, with timed checkpoint progression and optional time improvement opportunities used only when they did not compromise full course completion.
 
 Official Trial Results
 ----------------------
+
+The table below reports our official checkpoint timestamps recorded during the live runs, where each checkpoint time represents elapsed time from the start to that checkpoint. DNF indicates a run that terminated before reaching the remaining checkpoints, and these results are used to identify repeatability limits and isolate the course segment that most strongly constrained performance.
+
 
 .. list-table:: Obstacle Course Run Data
    :header-rows: 1
@@ -48,6 +53,21 @@ Official Trial Results
      - 0
      - 165.72
      - No
+
+.. raw:: html
+
+   <div style="text-align:center; margin-top: 10px; margin-bottom: 10px;">
+     <iframe width="900" height="506"
+             src="https://www.youtube.com/embed/gsIIfVX_UOE"
+             title="Successful Run"
+             frameborder="0"
+             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+             allowfullscreen>
+     </iframe>
+   </div>
+
+.. centered::
+   *Successful full course run recorded during the live time trials demonstration.*
 
 Summary
 -------
@@ -183,7 +203,7 @@ Timing Breakdown
    * - Start → CP 1
      - 32.91
      - 32.91
-     - Straight line, right turn fork (Radius = ),
+     - Straight line, right turn fork (Radius = 200mm),
    * - CP 1 → CP 2
      - 58.00
      - 25.09
