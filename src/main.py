@@ -1,25 +1,36 @@
-'''ME 405 Lab0x05 - Simple Navigation with Bump Sensor
-Forward -> Bump -> Backward
+"""
+Main program for autonomous obstacle course navigation robot.
+Implements cooperative multitasking scheduler with encoder-based odometry,
+line following, PI velocity control, and bump sensor collision detection.
 
-# Listing USB serial devices in Terminal:                 ls /dev/tty.*
-# Connecting to the board in Terminal:             screen /dev/tty.usbmodem205F379C39472 115200
-# To exit screen:                                   Ctrl-A, K, Y
-# To soft reset the board:                            Ctrl-D'''
+Hardware:
+    - Motors: 2x DC motors with encoders (1437.1 ticks/rev)
+    - IR Sensor Array: 7 reflectance sensors for line detection
+    - Bump Sensor: Collision detection on Pin PC11
+    - Wheel Diameter: 70mm (35mm radius)
+    - Track Width: 141mm
 
+Notes:
+    - Uses cotask cooperative scheduler with priority-based task execution
+    - Velocity control runs at 12ms period, closed-loop control at 20ms
+    - Encoder heading task computes robot orientation from differential encoders
+    - Navigation task coordinates line following, turns, and obstacle avoidance
+    - Serial task provides user interface for calibration and control
+"""
 import gc
+from time import ticks_us, ticks_diff
+
 import pyb
+from pyb import Pin, Timer, UART
 import cotask
 import task_share
-from pyb import Pin, Timer, UART
-from time import ticks_us, ticks_diff
+
 from motor import motor_driver
 from encoder import Encoder
-
+from multi_sensor_read import multiple_ir_readings
 import motor_ctrl_task_V3 as motor_ctrl_task
 import CL_control_task_V5 as CL_control_task
 from serial_task_V6 import serial_task_fun
-from multi_sensor_read import multiple_ir_readings 
-
 from encoder_heading_task import encoder_heading_task_fun
 from navigation_v2_compact_encoder import navigation_task_fun
 from bump_sensor_task import bump_sensor_task_fun

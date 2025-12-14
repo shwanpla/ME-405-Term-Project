@@ -1,6 +1,5 @@
 """
 Battery voltage monitoring module using ADC (Analog-to-Digital Converter).
-
 Reads voltage directly from pin PC0 with configurable averaging and sampling.
 Provides both class-based and convenience function interfaces for battery
 voltage measurements.
@@ -17,6 +16,7 @@ Notes:
 
 from pyb import Pin, ADC
 import time
+
 
 class BatteryMonitor:
     """

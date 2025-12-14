@@ -1,28 +1,29 @@
 """
-Compact Obstacle Course Navigation - Encoder-Based (optimized for scheduler performance)
-Uses encoder distance (mm) instead of state estimation X/Y coordinates.
-Uses encoder-calculated heading instead of IMU.
+Obstacle course navigation state machine using encoder-based odometry.
+24-state FSM coordinating line following, heading control, and obstacle avoidance.
+Uses encoder distance and heading instead of IMU for improved scheduler performance.
 
-Course Layout (Main Lap):
-- State 0-10: Main obstacle course
-- State 11: Exit section line following
-- State 12: Turn to 180°
-- State 13: Go straight at 180° through parking garage until distance > 4474mm
-- State 14: Turn to 175°
-- State 15: Go straight at 175° until bump detected
+Hardware:
+    - Motor Encoders: 1437.1 ticks/rev differential encoders
+    - IR Sensor Array: 7 reflectance sensors for line detection
+    - Bump Sensor: Wall collision detection
 
-Wall Interaction Recovery Sequence (States 16-23):
-- State 16: Back up 50mm
-- State 17: Turn to 0°
-- State 18: Go straight 175mm at 0°
-- State 19: Turn to 175°
-- State 20: Go straight 75mm at 175°
-- State 21: Turn to 180°
-- State 22: Line following at bias=0 for 200mm
-- State 23: Stop
+Notes:
+    - Distance thresholds measured in mm from encoder odometry
+    - Heading control uses encoder differential (not IMU)
+    - State 15 triggers bump sensor wall interaction sequence (States 16-23)
+    - Line following bias adjustable per state for curve navigation
+    - Force-straight mode overrides line following for precise heading control
 """
 
+
 def navigation_task_fun(shares):
+    """
+    Cooperative task function implementing obstacle course navigation FSM.
+
+    :param shares: Tuple of shared variables for inter-task communication
+    :type shares: tuple
+    """
     (line_follow_flg, enc_heading_share, enc_distance_share,
     left_controller_share, right_controller_share,
     left_set_point, right_set_point, 
@@ -381,8 +382,8 @@ def navigation_task_fun(shares):
                     nav_turn_flg.put(0)
                     bias_share.put(0.0)
                     desired_angle_share.put(HEADING_180)
-                    left_desired_vel.put(saved_velocity if saved_velocity > 0 else 100)
-                    right_desired_vel.put(saved_velocity if saved_velocity > 0 else 100)
+                    left_desired_vel.put(saved_velocity)
+                    right_desired_vel.put(saved_velocity)
                     
                     # Check for excessive heading drift and correct with bias
                     heading_error = calc_heading_error(heading, HEADING_180)
@@ -459,7 +460,6 @@ def navigation_task_fun(shares):
                 
                 # STATE 16: Back up until distance decreases by 50mm
                 elif STATE == 16:
-                    # FIXED: Initialize saved_velocity and reset integral flag on first entry
                     if STATE not in state_start_distances:
                         state_start_distances[STATE] = distance
                         saved_velocity = 50  # Set recovery velocity
@@ -503,7 +503,6 @@ def navigation_task_fun(shares):
                         transition_flags[17] = True
                         state_heading_set = False
                         nav_turn_flg.put(0)  # Disable turning
-                        # FIXED: Keep saved_velocity at 50 from backup, will use for STATE 18
                         print(f"[NAV] STATE 17→18: Heading {heading:.1f}° reached {STATE_17_TURN}°")
                         STATE = 18
                     else:
@@ -512,22 +511,18 @@ def navigation_task_fun(shares):
                 # STATE 18: Straight at 0° until distance threshold reached
                 elif STATE == 18:
                     line_follow_flg.put(0)
-                    force_straight_flg.put(1)  # Force straight motion
+                    force_straight_flg.put(1)
                     nav_turn_flg.put(0)
-                    bias_share.put(0.0)  # FIXED: Static bias, NO dynamic updates
+                    bias_share.put(0.0)
                     desired_angle_share.put(STATE_17_TURN)
-                    left_desired_vel.put(saved_velocity if saved_velocity > 0 else 50)
-                    right_desired_vel.put(saved_velocity if saved_velocity > 0 else 50)
-                    
+                    left_desired_vel.put(saved_velocity)
+                    right_desired_vel.put(saved_velocity)
+
                     if STATE not in state_start_distances:
                         state_start_distances[STATE] = distance
-                        transition_flags[18] = False  # Reset transition flag on entry
+                        transition_flags[18] = False
                         print(f"[NAV] STATE 18: Starting from {distance:.0f}mm, target: {distance + STATE_18_STRAIGHT:.0f}mm")
-                    
-                    # REMOVED: Dynamic bias adjustment
-                    # The force_straight_flg prevents line following, so no bias adjustment should happen
-                    # Any heading correction should come from the motor control's proportional gain
-                    
+
                     if distance >= state_start_distances[STATE] + STATE_18_STRAIGHT:
                         left_desired_vel.put(0)
                         right_desired_vel.put(0)
@@ -569,18 +564,16 @@ def navigation_task_fun(shares):
                     line_follow_flg.put(0)
                     force_straight_flg.put(1)
                     nav_turn_flg.put(0)
-                    bias_share.put(0.0)  # FIXED: Static bias, NO dynamic updates
+                    bias_share.put(0.0)
                     desired_angle_share.put(STATE_19_TURN)
-                    left_desired_vel.put(saved_velocity if saved_velocity > 0 else 50)
-                    right_desired_vel.put(saved_velocity if saved_velocity > 0 else 50)
-                    
+                    left_desired_vel.put(saved_velocity)
+                    right_desired_vel.put(saved_velocity)
+
                     if STATE not in state_start_distances:
                         state_start_distances[STATE] = distance
                         transition_flags[20] = False
                         print(f"[NAV] STATE 20: Starting from {distance:.0f}mm, target: {distance + STATE_20_STRAIGHT:.0f}mm")
-                    
-                    # REMOVED: Dynamic bias adjustment - conflicts with force_straight_flg
-                    
+
                     if distance >= state_start_distances[STATE] + STATE_20_STRAIGHT:
                         left_desired_vel.put(0)
                         right_desired_vel.put(0)
@@ -623,8 +616,8 @@ def navigation_task_fun(shares):
                     force_straight_flg.put(0)
                     nav_turn_flg.put(0)
                     bias_share.put(0.0)
-                    left_desired_vel.put(saved_velocity if saved_velocity > 0 else 50)
-                    right_desired_vel.put(saved_velocity if saved_velocity > 0 else 50)
+                    left_desired_vel.put(saved_velocity)
+                    right_desired_vel.put(saved_velocity)
                     
                     if STATE not in state_start_distances:
                         state_start_distances[STATE] = distance
