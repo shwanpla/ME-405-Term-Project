@@ -6,10 +6,9 @@ Official Trial Results
 
 .. list-table:: Obstacle Course Run Data
    :header-rows: 1
-   :widths: 8, 8, 12, 12, 12, 12, 12, 12, 15, 12, 10
+   :widths: 8, 12, 12, 12, 12, 12, 12, 15, 12, 10
 
-   * - Team
-     - Trial
+   * - Trial
      - Checkpoint 1 (s)
      - Checkpoint 2 (s)
      - Checkpoint 3 (s)
@@ -19,8 +18,7 @@ Official Trial Results
      - Cups (-3s ea.)
      - Processed Time (s)
      - Official (s)
-   * - mecha01
-     - 1
+   * - 1
      - 27.65
      - 55.91
      - 80.89
@@ -30,8 +28,7 @@ Official Trial Results
      - 0
      - DNF
      - Yes
-   * - mecha01
-     - 2
+   * - 2
      - 33.82
      - 58.87
      - 82.56
@@ -41,8 +38,7 @@ Official Trial Results
      - 0
      - DNF
      - Yes
-   * - mecha01
-     - 3
+   * - 3
      - 32.91
      - 58.00
      - 82.32
@@ -72,10 +68,9 @@ Summary
    - Checkpoint 1: 32.91s
    - Checkpoint 2: 58.00s
    - Checkpoint 3: 82.32s
-   - Checkpoint 4 (Garage Entry): 100.53s
-   - Checkpoint 5 (Garage Exit): 123.93s
-   - Checkpoint 6 (Wall Interaction): 165.72s
-   - Finish time: **165.72 seconds** (no cup bonuses)
+   - Checkpoint 4: 100.53s
+   - Checkpoint 5: 123.93s
+   - Checkpoint 6: 165.72s
 
 Key Observations
 ----------------
@@ -231,17 +226,7 @@ The final approach (41.79s) is the longest segment:
 Lessons Learned
 ---------------
 
-1. **Garage is the Bottleneck**: Both DNF runs failed entering the garage - this is the critical control challenge
-
-2. **Heading Stability in Tight Spaces**: Narrow corridors amplify control issues - tolerance must balance oscillation prevention with wall avoidance
-
-3. **Motor Symmetry Critical**: One motor pulling harder in the garage causes gradual wall contact and collision
-
-4. **Iterative Tuning**: Trial 1 & 2 failures pinpointed the exact problem (garage heading); targeted fixes resolved it
-
-5. **Wall Interaction is Secondary**: Only attempted once garage was working - the approach setup matters more than the final interaction
-
-6. **Safety Over Speed**: Trial 3 took 165.72s without collecting cups - navigating garage safely was the priority
+The trial runs highlighted critical issues with code reliability and project management. The same code failed 2/3 times but passed 1/3 times, revealing fundamental non-deterministic behavior rather than robust control design. This inconsistency points to the need for better version management practices - we should have used version control (git) more rigorously to track exactly what code changes were made between trials and to maintain stable, tested releases. Additionally, our code and share organization became chaotic during rapid iteration, making it difficult to identify which modules were causing failures. The scheduler implementation, in particular, suffered from poorly documented task timing relationships and unclear dependencies between cooperative tasks, making debugging timing-sensitive failures extremely difficult. For future projects, establishing clear file organization, documented interfaces between tasks/shares, well-commented scheduler configuration with explicit timing constraints, and a disciplined commit workflow would help isolate problems faster and ensure reproducible results across multiple runs.
 
 Recommendations for Future Runs
 --------------------------------
@@ -261,6 +246,7 @@ To achieve faster trial times, the following major improvements are needed:
    - Higher motor duty cycles throughout the course
    - Requires redesigning the scheduler task timing and tuples
    - Need to ensure control loop runs fast enough for increased speeds
+   - At the current speed (50mm/s), detouring to cups takes >3 seconds (negating the 3-second bonus). Higher speeds will make cup collection worthwhile.
 
 **2. Optimize IR Sensor Readings**
    - Current IR sensor polling may be limiting responsiveness
@@ -286,5 +272,3 @@ To achieve faster trial times, the following major improvements are needed:
    3. Increase speed incrementally while monitoring control stability
    4. Retune closed-loop controllers at each speed increment
    5. Final full-speed validation run
-
-**Risk**: Higher speeds increase the severity of control failures, especially in tight spaces like the garage corridor. Thorough testing required.
