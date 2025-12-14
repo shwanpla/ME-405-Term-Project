@@ -246,7 +246,71 @@ The final approach (41.79s) is the longest segment:
 Lessons Learned
 ---------------
 
+**Code Reliability and Version Management**
+
 The trial runs highlighted critical issues with code reliability and project management. The same code failed 2/3 times but passed 1/3 times, revealing fundamental non-deterministic behavior rather than robust control design. This inconsistency points to the need for better version management practices - we should have used version control (git) more rigorously to track exactly what code changes were made between trials and to maintain stable, tested releases. Additionally, our code and share organization became chaotic during rapid iteration, making it difficult to identify which modules were causing failures. The scheduler implementation, in particular, suffered from poorly documented task timing relationships and unclear dependencies between cooperative tasks, making debugging timing-sensitive failures extremely difficult. For future projects, establishing clear file organization, documented interfaces between tasks/shares, well-commented scheduler configuration with explicit timing constraints, and a disciplined commit workflow would help isolate problems faster and ensure reproducible results across multiple runs.
+
+**Wireless Communication Infrastructure**
+
+A critical operational limitation during trials was reliance on COM port (serial) communication via a hardwired connection to the microcontroller. This created several problems:
+
+- **Physical Constraint**: Required holding a laptop near the robot during operation, limiting mobility and creating practical challenges during live runs
+- **Calibration Bottleneck**: Black and white IR sensor calibration required manual serial commands (``black``, ``white``) before each run, with no real-time feedback on calibration values
+- **Limited Telemetry**: Lacked real-time wireless feedback of critical state data - distance traveled, current navigation state, motor speed, heading error - all valuable for in-run diagnostics and post-trial analysis
+- **Tuning Inflexibility**: Parameter changes (gain adjustments, bias values, heading thresholds) required code editing and reflashing, with no ability to tune constants on-the-fly from a remote interface
+
+A robust wireless Bluetooth interface would have provided significant advantages:
+
+1. **Wireless Command Interface**: Send calibration (``calibrate_black``, ``calibrate_white``) and control commands (``RUN``, ``PAUSE``, ``EMERGENCY_STOP``) without hardwired connection
+2. **Telemetry Streaming**: Receive real-time feedback via BT (distance, current state number, velocity, heading error) enabling live monitoring and better post-trial debugging
+3. **Dynamic Parameter Tuning**: Adjust :code:`Kp`, :code:`Ki`, line bias, heading tolerance, and speed setpoints without code changes or reflashing
+4. **Mobile Operation**: Operate and monitor the robot from an untethered device (phone, tablet), freeing the operator's mobility during trials
+5. **Data Logging**: Stream telemetry to device storage for offline analysis and performance trending
+
+Implementing a proper BT stack (e.g., HC-05 module with dedicated UART task) would have reduced operational friction significantly and likely improved trial performance by enabling iterative tuning and real-time diagnostics.
+
+**Operational Challenges**
+
+Beyond software, physical constraints impacted execution:
+
+- **Laptop Dependency**: Holding a laptop during live runs is awkward and limits positioning. The operator must maintain line-of-sight and proximity for serial communication, reducing the ability to observe the robot's full course traverse
+- **Cable Management**: USB cable connection adds another failure point and restricts movement around the course
+- **Lack of Remote Feedback**: Without wireless telemetry, only visual observation of robot motion provided diagnostic information - sensor states, control loop values, and heading stability remained opaque during the run
+
+**Odometry and Distance-Based Sequencing at Higher Speeds**
+
+The navigation system relies on encoder-based distance accumulation to transition between course states. In Trial 3, odometry timing was reliable and state transitions occurred at appropriate locations. However, this approach becomes increasingly risky at higher speeds:
+
+- **Slip Scales with Speed**: Higher motor duty cycles increase wheel slip on the floor. At 2x speed, slip percentage can double or more
+- **Cumulative Error Growth**: Over a full 165-second course run at higher speeds, accumulated slip compounds significantly - what was negligible error at 50mm/s becomes substantial at 100mm/s
+- **Hard Distance Thresholds**: Preset distance values (e.g., ``STATE_3_DIST = 1114.0 mm``) work well at slow speeds where slip is minimal, but at high speeds they become brittle transitions
+- **Speed Interaction**: Faster navigation means less time for the controller to correct position errors, so odometry accuracy becomes more critical
+
+**Why This Matters for Future Optimization**:
+
+When attempting to increase speed (Future Speed Optimization section), the reliance on fixed distance thresholds will become a liability:
+
+- At 2x current speed, wheel slip could introduce 100-150mm error over the course
+- Transitions to new states (especially heading changes like the garage entry) could occur 100-150mm off-target
+- The garage entry at checkpoint 4 is particularly sensitive - being off-target by that margin would cause wall contact even with good heading control
+
+The robot's current checkpoint 4 problem is **heading control** (cannot maintain heading in tight corridor), but attempting to increase speed without fixing odometry robustness will create NEW failures.
+
+**Better Approach for Higher-Speed Runs**:
+- Combine distance with sensory feedback (IR line detection to confirm position)
+- Implement optional dead-reckoning correction points where the robot re-synchronizes against known features
+- Use heading feedback in addition to distance to detect when odometry has drifted
+- Periodically reset distance accumulation at known course landmarks rather than relying on cumulative encoder counts
+
+**Recommendations for Future Trials**
+
+- Implement a wireless BT interface with command and telemetry support
+- Use dedicated BT communication task in scheduler with well-defined message protocol
+- Build a simple remote interface app (Python/mobile) for commands and real-time data visualization
+- Decouple operator from computer - enable monitoring from distance
+- Maintain clean version history with tagged releases before each trial attempt
+- Before increasing speed: validate odometry accuracy at incremental speed steps and add sensory checkpoints to prevent state transition misalignment
+- Add sensory validation to distance-based state transitions to mitigate encoder slip at higher speeds
 
 Recommendations for Future Runs
 --------------------------------
