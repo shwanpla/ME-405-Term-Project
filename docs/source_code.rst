@@ -3,37 +3,36 @@ Source Code
 ===========
 
 API Reference
--------------
+=============
 
-This section provides detailed API documentation for each source code module, automatically generated from docstrings in the code. Each module includes class definitions, method signatures, parameters, return types, and usage notes.
+This section documents the core modules from simple motor control up to complex navigation, automatically generated from source docstrings. Each section includes classes, methods, and usage parameters.
 
-Battery ADC Module
-~~~~~~~~~~~~~~~~~~
+Motor Driver
+============
 
-The battery ADC module provides voltage monitoring functionality using the microcontroller's analog-to-digital converter. It reads voltage directly from pin PC0 with configurable averaging to reduce noise. The module offers both a class-based interface for custom configurations and convenience functions for quick voltage readings.
+The motor driver provides PWM control of DC motors through an H-bridge interface. This is the fundamental building block for velocity control across the platform.
 
-.. code-block:: python
+.. automodule:: motor
+   :members:
+   :undoc-members:
 
-   class motor_driver:
-       def __init__(self, PWM_pin: Pin, DIR_pin: Pin, nSLP_pin: Pin, 
-                    tim: Timer, chan: int)
+Motor Driver Class
+------------------
 
-Constructor Parameters
-""""""""""""""""""""""
+.. py:class:: motor_driver(PWM_pin, DIR_pin, nSLP_pin, tim, chan)
 
-:param PWM_pin: Pin for PWM signal
-:type PWM_pin: Pin
-:param DIR_pin: Pin for direction control
-:type DIR_pin: Pin
-:param nSLP_pin: Pin for enable/sleep control (active high)
-:type nSLP_pin: Pin
-:param tim: Timer object for PWM generation
-:type tim: Timer
-:param chan: Timer channel number for PWM output
-:type chan: int
+   H-bridge motor driver with PWM speed control and directional control.
 
-Methods
-"""""""
+   :param PWM_pin: Pin for PWM signal
+   :type PWM_pin: pyb.Pin
+   :param DIR_pin: Pin for direction control
+   :type DIR_pin: pyb.Pin
+   :param nSLP_pin: Pin for enable/sleep control (active high)
+   :type nSLP_pin: pyb.Pin
+   :param tim: Timer object for PWM generation
+   :type tim: pyb.Timer
+   :param chan: Timer channel number for PWM output
+   :type chan: int
 
 .. py:method:: enable()
 
@@ -43,80 +42,52 @@ Methods
 
    Disable the motor driver by setting nSLP pin low.
 
-.. py:method:: set_effort(effort: float)
+.. py:method:: set_effort(effort)
 
    Set motor effort with direction control.
    
    :param effort: Motor effort (-100 to +100, positive=forward, negative=reverse)
    :type effort: float
 
-Notes
------
-- Positive effort = DIR low (forward direction)
-- Negative effort = DIR high (reverse direction)
+Motor Control Notes
+"""""""""""""""""""
+
+- Positive effort → DIR low (forward direction)
+- Negative effort → DIR high (reverse direction)
 - Effort range: -100 to +100 (percent duty cycle)
-- nSLP pin must be high to enable motor driver
+- nSLP pin must be high to enable driver IC
 
 --------
 
-encoder.py
-==========
-
-Overview
---------
-
-Quadrature encoder interface using hardware timer with velocity averaging. Handles 16-bit counter rollover and provides 5-point moving average velocity calculation.
-
-Hardware
---------
-- **Timer**: Hardware timer in encoder mode (ENC_AB)
-- **Channels**: A and B quadrature signals
-- **Counter Resolution**: 16-bit (0-65535)
-
-Classes
--------
 
 Encoder
-^^^^^^^
+=======
 
-Quadrature encoder driver with position tracking and averaged velocity.
+Position and velocity feedback is critical for both motor control and navigation. The encoder module provides quadrature decoding with hardware timer support and averaged velocity calculation to smooth sensor noise.
 
-.. code-block:: python
+.. automodule:: encoder
+   :members:
+   :undoc-members:
 
-   class Encoder:
-       def __init__(self, tim, chA_pin, chB_pin)
+Encoder Class
+-------------
 
-Constructor Parameters
-""""""""""""""""""""""
+.. py:class:: Encoder(tim, chA_pin, chB_pin)
 
-:param tim: Hardware timer object
-:type tim: Timer
-:param chA_pin: Pin for encoder channel A
-:type chA_pin: Pin
-:param chB_pin: Pin for encoder channel B
-:type chB_pin: Pin
+   Quadrature encoder driver with position tracking and averaged velocity.
 
-Attributes
-""""""""""
-
-:ivar position: Accumulated encoder position (ticks)
-:vartype position: int
-:ivar prev_count: Previous timer counter value
-:vartype prev_count: int
-:ivar delta: Change in position since last update
-:vartype delta: int
-:ivar dt: Time elapsed since last update (microseconds)
-:vartype dt: int
-
-Methods
-"""""""
+   :param tim: Hardware timer object configured in encoder mode
+   :type tim: pyb.Timer
+   :param chA_pin: Pin for encoder channel A
+   :type chA_pin: pyb.Pin
+   :param chB_pin: Pin for encoder channel B
+   :type chB_pin: pyb.Pin
 
 .. py:method:: update()
 
    Update position and velocity from timer counter with rollover handling.
    
-   Calculates delta position handling 16-bit wraparound, updates velocity buffer
-   with 5-point moving average.
+   Calculates delta position handling 16-bit wraparound, updates velocity buffer with 5-point moving average.
 
 .. py:method:: get_position()
 
@@ -136,93 +107,85 @@ Methods
 
    Reset encoder position to zero.
 
-Notes
------
-- Position increments are inverted (subtracted) for correct direction
-- Velocity averaged over 5 samples to reduce noise
-- Handles timer overflow/underflow automatically
-
---------
-
-CL_control_task_V5.py
-=====================
-
-Overview
---------
-
-Closed-loop PI control task for dual motor velocity and heading control. Implements velocity PI control with line-following adjustment and heading-based turning control.
-
-Hardware
---------
-- **IR Sensor Array**: 8 reflectance sensors for line detection
-- **Motor Encoders**: 1437.1 ticks/rev
-- **Wheel Diameter**: 70mm (35mm radius)
-
-Classes
--------
-
-CL_control
-^^^^^^^^^^
-
-Closed-loop PI controller for a single motor with line-following capability.
-
-.. code-block:: python
-
-   class CL_control:
-       def __init__(self, multiple_ir_readings_object, motor)
-
-Constructor Parameters
+Encoder Hardware Notes
 """"""""""""""""""""""
 
-:param multiple_ir_readings_object: IR sensor array object
-:type multiple_ir_readings_object: multiple_ir_readings
-:param motor: Motor identifier ("LEFT" or "RIGHT")
-:type motor: str
+- **Timer**: Must be configured in :code:`ENC_AB` encoder mode
+- **Channels**: A and B quadrature signals on timer channels 1 and 2
+- **Counter Resolution**: 16-bit (0-65535) with automatic rollover handling
+- **Position**: Accumulates to avoid counter reset issues
+- **Velocity**: 5-sample moving average reduces high-frequency noise
 
-States
-""""""
+--------
 
-:S0_INIT: Initialize control parameters
-:S1_RUN: Main control loop with line following
-:S2_REST: Motors stopped
-:S3_TURN: Heading-based turning control
 
-Control Parameters
-""""""""""""""""""
+Closed-Loop Velocity Control
+=============================
 
-Velocity Control
-''''''''''''''''
-- **Kp**: 0.07 (proportional gain)
-- **Ki**: 0.035 (integral gain)
-- **U_MAX**: 100 (maximum control output)
-- **Battery Scaling**: Gains scaled by v_nom/v_battery for consistent performance
+With motors and encoders in place, we implement PI control to maintain desired velocities. The closed-loop controller handles both straight-line tracking with IR-based line following and heading-based turning for navigation.
 
-Line Following
-''''''''''''''
-- **ln_const**: 1.7 (line error proportional gain)
-- **ln_integ_const**: 1.0 (line error integral gain)
+.. automodule:: CL_control_task_V5
+   :members:
+   :undoc-members:
 
-Turning Control
-'''''''''''''''
-- **Kp_turn**: 0.45 (heading proportional gain)
-- **Ki_turn**: 0.01 (heading integral gain)
-- **TURN_EFFORT_MAX**: 20 (maximum turning effort)
+CL_control Class
+----------------
 
-Methods
-"""""""
+.. py:class:: CL_control(multiple_ir_readings_object, motor)
+
+   Closed-loop PI controller for a single motor with line-following capability.
+
+   :param multiple_ir_readings_object: IR sensor array object for line sensing
+   :type multiple_ir_readings_object: multiple_ir_readings
+   :param motor: Motor identifier (``"LEFT"`` or ``"RIGHT"``)
+   :type motor: str
 
 .. py:method:: run(shares)
 
    Cooperative task function implementing PI velocity control with line following.
    
-   :param shares: Tuple of shared variables for inter-task communication
+   Executes state machine: initialize → run (with line following) → optional rest and turning states.
+   
+   :param shares: Tuple containing all shared variables for inter-task communication
    :type shares: tuple
 
-Features
---------
+Velocity Control Parameters
+"""""""""""""""""""""""""""
 
-Anti-Windup
-^^^^^^^^^^^
+.. code-block:: python
+
+   Kp = 0.07              # Proportional gain
+   Ki = 0.035             # Integral gain
+   U_MAX = 100            # Maximum control output (% effort)
+   TICKS_PER_REV = 1437.1 # Encoder resolution
+   WHEEL_CIRC_MM = 220    # Wheel circumference in mm
+
+**Battery Compensation**: Gains are scaled by :math:`K = K_{nominal} \times \frac{V_{nominal}}{V_{battery}}` to maintain consistent performance as battery voltage drops.
+
+Line Following Parameters
+"""""""""""""""""""""""""
+
+.. code-block:: python
+
+   ln_const = 1.7         # Line error proportional gain
+   ln_integ_const = 1.0   # Line error integral gain
+
+When :code:`line_follow_flg = 1`, steering error from the IR sensor array modulates the differential velocity between left and right motors.
+
+Heading Control Parameters
+""""""""""""""""""""""""""
+
+.. code-block:: python
+
+   Kp_turn = 0.45         # Heading proportional gain
+   Ki_turn = 0.01         # Heading integral gain
+   TURN_EFFORT_MAX = 20   # Maximum turning effort
+
+When :code:`nav_turn_flg = 1`, heading error from the encoder odometry drives motor differential.
+
+Anti-Windup Protection
+""""""""""""""""""""""
+
 Prevents integral accumulation during saturation:
 
 .. code-block:: python
@@ -231,98 +194,56 @@ Prevents integral accumulation during saturation:
    satur_lo = (u <= -U_MAX + 1e-9)
    if (not satur_hi or e < 0) and (not satur_lo or e > 0):
        integ += e * dt
-       ln_integral += ln_error * dt
 
-Battery Voltage Compensation
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Scales gains to maintain consistent performance across battery discharge:
+Force-Straight Mode
+"""""""""""""""""""
 
-.. code-block:: python
-
-   Kp = v_nom/batt_v * Kp
-   Ki = v_nom/batt_v * Ki
-
-Force Straight Mode
-^^^^^^^^^^^^^^^^^^^
-Overrides line-following for precise heading control:
-
-.. code-block:: python
-
-   if force_straight_flg.get() == 1:
-       ln_error = 0.0  # Disable line following adjustment
-
-Notes
------
-- Gains are scaled by battery voltage for consistent performance
-- Anti-windup prevents integral accumulation during saturation
-- Force-straight mode overrides line-following for precise heading control
+When :code:`force_straight_flg = 1`, line following is disabled (:code:`ln_error = 0`) and only heading-based control is active, providing precise directional control for turns.
 
 --------
 
-line_follow_V1.py
-=================
 
-Overview
---------
+Line Following
+===============
 
-Line following controller using centroid-based error calculation. Computes steering error from IR sensor array with configurable bias for directional preference.
+For the vehicle to track a line, we extract steering error from the IR sensor array using centroid-based weighting. This error then feeds into the closed-loop controller's differential velocity command.
 
-Hardware
---------
-- **IR Sensor Array**: 7 sensors (indexed -3 to +3 from left to right)
-- **ADC Resolution**: 12-bit (0-4095)
+.. automodule:: line_follow_V1
+   :members:
+   :undoc-members:
 
-Classes
--------
+LineFollower Class
+------------------
 
-LineFollower
-^^^^^^^^^^^^
+.. py:class:: LineFollower(multi_sensor_read_object, black, white, bias=0.0)
 
-Line following controller with weighted centroid error calculation.
+   Line following controller with weighted centroid error calculation.
 
-.. code-block:: python
-
-   class LineFollower:
-       def __init__(self, multi_sensor_read_object, black, white, bias=0.0)
-
-Constructor Parameters
-""""""""""""""""""""""
-
-:param multi_sensor_read_object: IR sensor array object
-:type multi_sensor_read_object: multiple_ir_readings
-:param black: ADC value for black surface (line)
-:type black: int
-:param white: ADC value for white surface (background)
-:type white: int
-:param bias: Steering bias (positive=right, negative=left, range: -3 to +3)
-:type bias: float
-
-Attributes
-""""""""""
-
-:ivar weights: Sensor position weights [-3, -2, -1, 0, 1, 2, 3]
-:vartype weights: list
-
-Methods
-"""""""
+   :param multi_sensor_read_object: IR sensor array object
+   :type multi_sensor_read_object: multiple_ir_readings
+   :param black: ADC value for black surface (line)
+   :type black: int
+   :param white: ADC value for white surface (background)
+   :type white: int
+   :param bias: Steering bias (positive=right, negative=left, range: -3 to +3)
+   :type bias: float
 
 .. py:method:: calculate_error()
 
    Calculate steering error using weighted centroid of normalized sensor readings.
    
+   **Algorithm:**
+   
+   1. Normalize: :math:`norm = \frac{reading - white}{black - white}`, clamped to [0, 1]
+   2. Compute centroid: :math:`error = \frac{\sum w_i \cdot norm_i}{\sum norm_i}`
+   3. Apply bias: :math:`final\_error = error + bias`
+   
    :return: Steering error (-3 to +3, including bias)
    :rtype: float
-   
-   Algorithm:
-   
-   1. Normalize each sensor reading: ``norm = (reading - white) / (black - white)``
-   2. Clamp to [0, 1]
-   3. Calculate weighted centroid: ``error = sum(weight * norm) / sum(norm)``
-   4. Add bias: ``biased_error = error + bias``
 
 .. py:method:: set_bias(bias)
 
-   Update steering bias dynamically.
+   Update steering bias dynamically for curves or fork detection.
    
    :param bias: New steering bias value
    :type bias: float
@@ -336,7 +257,7 @@ Methods
 
 .. py:function:: calibrate(multi_sensor_read_object)
 
-   Calculate average sensor reading for calibration.
+   Calculate average sensor reading for calibration reference.
    
    :param multi_sensor_read_object: IR sensor array object
    :type multi_sensor_read_object: multiple_ir_readings
@@ -344,74 +265,126 @@ Methods
    :rtype: float
 
 Error Convention
-----------------
+"""""""""""""""
+
 - **Positive error**: Line to the right → turn right
 - **Negative error**: Line to the left → turn left
-- **Bias**: Allows preferential steering for forks or curves
+- **Bias**: Allows preferential steering for complex course sections (forks, curves)
 
 --------
 
-navigation_v2_compact_encoder.py
-=================================
 
-Overview
---------
+Autonomous Navigation
+======================
 
-Compact obstacle course navigation using encoder-based odometry. Implements 24-state finite state machine for autonomous navigation through complex course with bump sensor collision recovery.
+The navigation task orchestrates the entire system through a 24-state finite state machine. It sequences line following, heading control, and collision recovery to autonomously navigate the obstacle course.
 
-States
-------
+.. automodule:: navigation_v2_compact_encoder
+   :members:
+   :undoc-members:
 
-Course Navigation (States 0-15)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-:State 0: Line following at bias=0 until 650mm
-:State 1: Fork quarter-circle line following (bias=1.55) until 914mm
-:State 2: Turn to -90°
-:State 3: Straight at -90° through diamond until 1114mm
-:State 4: U-turn semicircle line following until 1742mm
-:State 5: Turn to 90°
-:State 6: Straight at 90° through parking garage until 1992mm
-:State 7: Fork quarter-circle (bias=1.8) until 2227mm
-:State 8: Complex section with 2x quarter circles until 3549mm
-:State 9: Turn to 180°
-:State 10: Straight at 180° until 3849mm
-:State 11: Line following (bias=0.2) until 4099mm
-:State 12: Turn to 180°
-:State 13: Straight through parking garage until 4799mm
-:State 14: Turn to 90°
-:State 15: Straight until bump detected or 5149mm
-
-Wall Recovery Sequence (States 16-23)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Triggered when bump sensor detects wall during State 15:
-
-:State 16: Back up 50mm
-:State 17: Turn to 0°
-:State 18: Go straight 175mm at 0°
-:State 19: Turn to 90°
-:State 20: Go straight 200mm at 90°
-:State 21: Turn to 180°
-:State 22: Line following 200mm at bias=0
-:State 23: STOP - Course complete
-
-Functions
----------
+Navigation Task Function
+------------------------
 
 .. py:function:: navigation_task_fun(shares)
 
    Cooperative task function implementing 24-state obstacle course FSM.
    
+   Handles course progression, state transitions based on distance/heading thresholds, and wall collision recovery.
+   
    :param shares: Tuple containing all navigation-related shared variables
    :type shares: tuple
 
+Course Navigation States (0–15)
+"""""""""""""""""""""""""""""""
+
+The robot progresses through distinct course sections, each with distance targets and heading setpoints:
+
+.. code-block:: python
+
+   State 0:  Line follow (bias=0)          → 650 mm
+   State 1:  Fork quarter-circle (bias=1.55) → 914 mm
+   State 2:  Turn to heading -90°
+   State 3:  Straight at -90°            → 1114 mm (diamond section)
+   State 4:  U-turn semicircle            → 1742 mm
+   State 5:  Turn to heading 90°
+   State 6:  Straight at 90°              → 1992 mm (parking garage)
+   State 7:  Fork quarter-circle (bias=1.8) → 2227 mm
+   State 8:  Complex 2× quarter-circles   → 3549 mm
+   State 9:  Turn to heading 180°
+   State 10: Straight at 180°             → 3849 mm
+   State 11: Line follow (bias=0.2)       → 4099 mm
+   State 12: Turn to heading 180°
+   State 13: Straight through parking     → 4799 mm
+   State 14: Turn to heading 90°
+   State 15: Straight until bump or      → 5149 mm
+
+Wall Recovery Sequence (States 16–23)
+""""""""""""""""""""""""""""""""""""""
+
+When bump sensor detects collision during State 15:
+
+.. code-block:: python
+
+   State 16: Back up 50 mm
+   State 17: Turn to heading 0°
+   State 18: Go straight 175 mm at 0°
+   State 19: Turn to heading 90°
+   State 20: Go straight 200 mm at 90°
+   State 21: Turn to heading 180°
+   State 22: Line follow 200 mm (bias=0)
+   State 23: STOP — course complete
+
+Configuration Parameters
+------------------------
+
+Distance Thresholds (millimeters)
+"""""""""""""""""""""""""""""""""
+
+.. code-block:: python
+
+   STATE_0_DIST   = 650.0         # Start to fork entrance
+   STATE_1_DIST   = 914.0         # Fork quarter-circle
+   STATE_3_DIST   = 1114.0        # Through diamond
+   STATE_4_DIST   = 1742.0        # After U-turn
+   STATE_6_DIST   = 1992.0        # Before second fork
+   STATE_7_DIST   = 2227.0        # Second fork complete
+   STATE_8_DIST   = 3549.0        # Complex section complete
+   STATE_10_DIST  = 3849.0        # Approach finish
+   STATE_11_DIST  = 4099.0        # Enter final parking
+   STATE_13_DIST  = 4799.0        # Exit final parking
+   STATE_15_DIST  = 5149.0        # Maximum distance
+
+Heading Targets (degrees)
+"""""""""""""""""""""""""
+
+.. code-block:: python
+
+   HEADING_NEG_90   = -90.0       # Diamond section heading
+   HEADING_90       = 90.0        # Parking garage heading
+   HEADING_180      = 180.0       # Return path heading
+   HEADING_TOLERANCE = 4.0        # ±4° acceptance band
+
+Control Modes
+"""""""""""""
+
+**Line Following Mode** (``line_follow_flg = 1``)
+  Uses IR sensor centroid with configurable bias for directional tracking.
+
+**Force Straight Mode** (``force_straight_flg = 1``)
+  Disables line following; uses encoder-based heading control for precision turns.
+
+**Turning Mode** (``nav_turn_flg = 1``)
+  Heading-based PI control with zero velocity until target heading reached.
+
 Helper Functions
-^^^^^^^^^^^^^^^^
+""""""""""""""""
 
 .. py:function:: calc_heading_error(current_heading, target_heading)
 
    Calculate normalized heading error in range [-180, 180].
+   
+   Handles angle wrapping to find shortest path to target heading.
    
    :param current_heading: Current robot heading in degrees
    :type current_heading: float
@@ -420,122 +393,80 @@ Helper Functions
    :return: Heading error in degrees
    :rtype: float
 
-Configuration Parameters
-------------------------
+Navigation Notes
+""""""""""""""""
 
-Distance Thresholds (mm)
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-   STATE_0_DIST = 650.0          # Start to fork entrance
-   STATE_1_DIST = 914.0          # Fork quarter-circle
-   STATE_3_DIST = 1114.0         # Through diamond
-   STATE_4_DIST = 1742.0         # After U-turn
-   STATE_6_DIST = 1992.0         # Before second fork
-   STATE_7_DIST = 2227.0         # Second fork complete
-   STATE_8_DIST = 3549.0         # Complex section complete
-   STATE_10_DIST = 3849.0        # Approach to finish
-   STATE_11_DIST = 4099.0        # Enter parking garage
-   STATE_13_DIST = 4799.0        # Exit parking garage
-   STATE_15_DIST = 5149.0        # Maximum distance
-
-Heading Targets
-^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-   HEADING_NEG_90 = -90.0        # Diamond section
-   HEADING_90 = 90.0             # Parking garage exit
-   HEADING_180 = 180.0           # Return path
-   HEADING_TOLERANCE = 4.0       # ±4° acceptance
-
-Control Modes
--------------
-
-Line Following Mode
-^^^^^^^^^^^^^^^^^^^
-- Sets ``line_follow_flg = 1``
-- Uses IR sensor centroid tracking
-- Configurable bias for directional preference
-
-Force Straight Mode
-^^^^^^^^^^^^^^^^^^^
-- Sets ``force_straight_flg = 1``
-- Disables line following
-- Maintains precise heading using encoder feedback
-
-Turning Mode
-^^^^^^^^^^^^
-- Sets ``nav_turn_flg = 1``
-- Uses heading-based PI control
-- Zero velocity during turn
-
-Notes
------
-- Uses encoder distance (mm) instead of X/Y coordinates
-- Uses encoder-calculated heading instead of IMU
-- Bump sensor triggers wall recovery sequence
-- State transitions based on distance thresholds and heading targets
+- Odometry uses encoder distance (not X/Y coordinates)
+- Heading is encoder-calculated (not IMU-based)
+- Bump sensor in State 15 triggers wall recovery sequence
+- State transitions are distance-driven or heading-driven
+- Bias parameter tunes line following for complex curves
 
 --------
 
-encoder_heading_task.py
-=======================
 
-Overview
---------
+Encoder Odometry
+=================
 
-Odometry task for calculating robot heading and distance from encoder data. Computes heading from encoder differential and distance from average encoder ticks.
+To navigate the course, we need to track position and heading. The encoder odometry task reads dual encoders and computes distance traveled and heading angle using kinematic relationships.
 
-Hardware
---------
-- **Motor Encoders**: 1437.1 ticks/rev
-- **Wheel Radius**: 35mm
-- **Track Width**: 141mm
+.. automodule:: encoder_heading_task
+   :members:
+   :undoc-members:
 
-Functions
----------
+Encoder Odometry Function
+--------------------------
 
 .. py:function:: encoder_heading_task_fun(shares)
 
    Cooperative task function that computes heading and distance from encoders.
    
-   :param shares: Tuple of (left_enc_pos, right_enc_pos, enc_heading_share, enc_distance_share)
+   Updates shared state from left and right encoder positions at each iteration.
+   
+   :param shares: Tuple of ``(left_enc_pos, right_enc_pos, enc_heading_share, enc_distance_share)``
    :type shares: tuple
 
-Constants
----------
+Hardware Constants
+""""""""""""""""""
 
 .. code-block:: python
 
-   WHEEL_RADIUS_M = 0.035        # Wheel radius in meters
-   TICKS_PER_REV = 1437.1        # Encoder ticks per revolution
-   TRACK_WIDTH_M = 0.141         # Distance between wheels in meters
-   WHEEL_CIRC_M = 0.21991        # Wheel circumference in meters
-   MM_PER_TICK = 0.1530          # Millimeters per encoder tick
+   WHEEL_RADIUS_MM = 35.0         # Wheel radius in millimeters
+   TICKS_PER_REV = 1437.1         # Encoder ticks per complete revolution
+   TRACK_WIDTH_MM = 141.0         # Distance between left and right wheels
+   WHEEL_CIRC_MM = 220.0          # Wheel circumference: 2π × radius
+   MM_PER_TICK = 0.153            # Millimeters per encoder tick
 
-Calculations
-------------
+Odometry Calculations
+"""""""""""""""""""""
 
-Distance
-^^^^^^^^
-.. code-block:: python
+**Distance Traveled**
 
-   avg_ticks = (left_ticks + right_ticks) / 2.0
-   distance_mm = avg_ticks * MM_PER_TICK
+.. math::
 
-Heading
-^^^^^^^
-.. code-block:: python
+   \text{distance} = \frac{\text{left\_ticks} + \text{right\_ticks}}{2.0} \times \text{MM\_PER\_TICK}
 
-   tick_diff = left_ticks - right_ticks
-   heading_rad = (tick_diff / TICKS_PER_REV) * (WHEEL_CIRC_M / TRACK_WIDTH_M)
-   heading_deg = heading_rad * (180.0 / pi)
+Average of both encoders smooths odometry error and provides forward displacement in millimeters.
 
-Heading Unwrapping
-^^^^^^^^^^^^^^^^^^
-Handles ±180° discontinuities smoothly:
+**Heading Angle**
+
+.. math::
+
+   \text{tick\_diff} = \text{left\_ticks} - \text{right\_ticks}
+
+.. math::
+
+   \text{heading\_rad} = \frac{\text{tick\_diff}}{\text{TICKS\_PER\_REV}} \times \frac{\text{WHEEL\_CIRC\_MM}}{\text{TRACK\_WIDTH\_MM}}
+
+.. math::
+
+   \text{heading\_deg} = \text{heading\_rad} \times \frac{180}{\pi}
+
+Positive heading indicates counter-clockwise rotation (left turn).
+
+**Heading Unwrapping**
+
+To handle the ±180° discontinuity smoothly, delta heading is checked and adjusted:
 
 .. code-block:: python
 
@@ -546,81 +477,104 @@ Handles ±180° discontinuities smoothly:
        delta += 360
    continuous_heading += delta
 
-Notes
------
+Odometry Notes
+""""""""""""""
+
 - Positive heading = counter-clockwise rotation (left turn)
-- Heading normalized to [-180, 180] degrees
-- Distance calculated as average of left and right encoder ticks
-- Uses unwrapping to prevent discontinuities at ±180°
+- Heading normalized to [-180, 180]° range
+- Heading unwrapping prevents jumps at ±180° boundary
+- Distance accumulation provides cumulative traveled distance
 
 --------
 
-bump_sensor_task.py
+
+Supporting Sensors
 ===================
 
-Overview
---------
+Bump Sensor
+-----------
 
-Bump sensor monitoring task for collision detection. Continuously polls bump sensor and sets shared flag when collision is detected.
-
-Hardware
---------
-- **Bump Sensor Pin**: PC11 (active LOW, pull-up resistor enabled)
-- **Debounce Time**: 30ms
-
-Functions
----------
+.. automodule:: bump_sensor_task
+   :members:
+   :undoc-members:
 
 .. py:function:: bump_sensor_task_fun(shares)
 
    Cooperative task function that monitors bump sensor and updates shared state.
    
-   :param shares: Tuple containing bump_detected_share (Share object)
+   Detects wall collisions during navigation and signals recovery sequence.
+   
+   :param shares: Tuple containing ``bump_detected_share`` (Share object)
    :type shares: tuple
 
+Bump Sensor Hardware
+""""""""""""""""""""
+
+- **Pin**: :code:`PC11` (active LOW, pull-up resistor enabled)
+- **Debounce Time**: 30 ms
+- **Trigger**: Pressed (logic 0) → sets :code:`bump_detected_share = 1`
+
 Algorithm
----------
+"""""""""
 
 1. Read bump sensor pin state
 2. If pressed (LOW) and not already detected:
-   
-   a. Wait 30ms (debounce)
+
+   a. Wait 30 ms (debounce time)
    b. Confirm still pressed
-   c. Set ``bump_detected_share = 1``
-   d. Set ``bump_already_detected = True``
+   c. Set :code:`bump_detected_share = 1`
+   d. Set :code:`bump_already_detected = True` (prevents re-trigger)
    e. Print detection message
 
 3. Yield to scheduler
 
-Notes
------
-- Sensor is active LOW (pressed = 0, released = 1)
-- Only triggers once per run (bump_already_detected flag)
-- Requires cotask scheduler to yield control
-- 30ms debounce prevents false triggers
+Bump Sensor Notes
+"""""""""""""""""
+
+- Sensor is active LOW: pressed = 0, released = 1
+- Only triggers once per run (one-shot behavior)
+- 30 ms debounce prevents false triggers from noise
+- Used in navigation State 15 to trigger wall recovery
+
+Battery Monitor
+---------------
+
+.. automodule:: battery_adc
+   :members:
+   :undoc-members:
+
+Battery voltage monitoring is critical for compensating motor control gains as battery discharges during operation.
+
+.. py:class:: BatteryMonitor(adc_pin=None, samples=10)
+
+   ADC-based battery voltage monitor with configurable averaging.
+
+   :param adc_pin: ADC pin for voltage measurement (default: :code:`PC0`)
+   :type adc_pin: pyb.Pin or str
+   :param samples: Number of samples for averaging
+   :type samples: int
+
+Battery Hardware
+""""""""""""""""
+
+- **ADC Pin**: :code:`PC0` (default, configurable)
+- **Reference Voltage**: 3.3 V
+- **ADC Resolution**: 12-bit (0–4095)
+- **Voltage Scaling**: Depends on voltage divider on battery circuit
+
+.. py:function:: battery_voltage()
+
+   Get current battery voltage (convenience function).
+   
+   :return: Battery voltage in volts
+   :rtype: float
+
+Battery Monitor Notes
+"""""""""""""""""""""
+
+- Voltage readings are averaged to reduce noise
+- Used in ``CL_control`` to scale PI gains
+- Maintains consistent control performance across battery discharge
+- Nominal battery voltage: 3.07 V (example reference)
 
 --------
-
-battery_adc.py
-==============
-
-Overview
---------
-
-Battery voltage monitoring module using ADC (Analog-to-Digital Converter). Reads voltage directly from pin with configurable averaging and sampling.
-
-Hardware
---------
-- **ADC Pin**: PC0 (default, configurable)
-- **Reference Voltage**: 3.3V
-- **Resolution**: 12-bit ADC (0-4095)
-
-Classes
--------
-
-BatteryMonitor
-^^^^^^^^^^^^^^
-
-ADC-based battery voltage monitor with configurable averaging.
-
-.. code-block::
