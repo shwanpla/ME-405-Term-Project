@@ -3,7 +3,7 @@ Wiring
 
 This page defines the electrical interconnects used on Romi, including motor driver control, encoder feedback, reflectance sensing, inertial sensing, bump event inputs, battery monitoring, and Bluetooth serial communication. The goal is to provide a single reference for connector level wiring, Nucleo pin assignments, and the signals required by each subsystem task.
 
-.. image:: /images/nucleo_pinout.png
+.. image:: /images/pinout.png
    :width: 900px
    :align: center
 
