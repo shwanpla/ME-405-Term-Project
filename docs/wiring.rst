@@ -349,7 +349,7 @@ UART1 Bluetooth pin mapping
 Full Assembly
 -------------
 
-.. image:: /images/romi_full_assembly.jpg
+.. image:: /images/romi_full_assembly.png
    :width: 900px
    :align: center
 
