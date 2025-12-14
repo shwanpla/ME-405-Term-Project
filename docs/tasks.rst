@@ -80,12 +80,12 @@ Encoder Heading Task
 
 The encoder heading task represents the real time odometry estimator based on differential drive kinematics. It runs as a continuous periodic loop rather than a multi state FSM, converting left and right encoder motion into forward distance traveled and heading change. This task provides the primary state variables used by navigation to trigger distance based transitions and to evaluate heading error during forced straight and turn segments.
 
-.. image:: /images/encoder_heading.png
+.. image:: /images/encoder_heading_task_fsm.png
    :width: 85%
    :align: center
 
 .. centered::
-   *Encoder based odometry computation converting left and right wheel motion into forward distance and heading used by navigation and turning control.*
+   *Encoder heading task FSM showing continuous periodic odometry computation with unwrapping and normalization.*
 
 Each update converts encoder ticks into wheel displacement, integrates the average displacement into distance, and integrates the wheel displacement difference into heading using the known track width. To keep the heading estimate usable for control, the algorithm handles wraparound at plus or minus 180 degrees by unwrapping discontinuities and re normalizing the final heading into a consistent range. The output shares provide a continuously updated distance and heading estimate that all higher level logic can consume without directly reading encoder hardware.
 
@@ -108,7 +108,7 @@ Bump Sensor Task
 
 The bump sensor task represents a discrete event detector used for wall interaction handling. It continuously monitors a digital input and sets a shared bump flag when contact is detected, providing a clean trigger for navigation to transition into a recovery routine. The task is designed to avoid noisy repeated triggers by enforcing a single confirmed event per run using debounce logic and a latched detected state.
 
-.. image:: /images/bump_task.png
+.. image:: /images/bump_sensor_task_fsm.png
    :width: 70%
    :align: center
 
