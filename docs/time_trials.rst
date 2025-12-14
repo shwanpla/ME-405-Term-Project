@@ -57,7 +57,7 @@ The table below reports our official checkpoint timestamps recorded during the l
 .. raw:: html
 
    <div style="text-align:center; margin-top: 10px; margin-bottom: 10px;">
-     <iframe width="900" height="506"
+     <iframe width="720" height="405"
              src="https://www.youtube.com/embed/gsIIfVX_UOE"
              title="Successful Run"
              frameborder="0"
