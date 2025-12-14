@@ -1,9 +1,6 @@
 Hardware
 ========
 
-Hardware
-========
-
 This page summarizes the physical hardware stack used to build Romi for ME 405, with emphasis on the components that directly enabled robust sensing, repeatable closed loop motion, and reliable autonomy during timed obstacle course runs. The system combines a differential drive base with embedded compute, power management, and multiple sensing modalities so that navigation decisions are always grounded in real time measurements rather than open loop assumptions.
 
 Key Hardware Parameters
