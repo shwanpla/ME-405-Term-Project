@@ -2,7 +2,7 @@
 
 In **ME 405 Mechatronics**, our three-person team delivered an autonomous two-wheeled differential-drive robot named **Romi**, engineered for robust, repeatable navigation of a timed obstacle course. The system combines embedded hardware integration, real-time **MicroPython** firmware on an STM32 Nucleo, cooperative multitasking, multi-sensor instrumentation, and closed-loop control with state-space methods to produce reliable behavior across multiple trials.
 
-**Documentation:** https://me-405-term-project.readthedocs.io/en/latest/index.html :contentReference[oaicite:0]{index=0}  
+**Documentation:** https://me-405-term-project.readthedocs.io/en/latest/index.html 
 **Repository:** https://github.com/shwanpla/ME-405-Term-Project
 
 ## What this project demonstrates
