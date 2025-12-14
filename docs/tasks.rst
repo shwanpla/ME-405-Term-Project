@@ -117,30 +117,31 @@ The bump sensor task represents a discrete event detector used for wall interact
 
 Because this task publishes an event rather than a continuous measurement, its output is treated as an interrupt style condition within the FSM logic. When asserted, navigation can reliably assume a collision occurred and execute a deterministic recovery sequence without ambiguity due to switch chatter or vibration.
 
-IMU Handler Task
-----------------
 
-The IMU handler task represents inertial sensor management over I2C, including initialization, calibration management, and data readiness. It is responsible for bringing the IMU into a known operating mode and ensuring that usable heading or yaw rate information is available to other tasks. Calibration persistence is handled by loading a saved calibration blob when present, and saving new calibration data after a successful manual procedure so repeated runs can start quickly with consistent sensor behavior.
-
-.. image:: /images/imu_handler_fsm.png
-   :width: 90%
-   :align: center
-
-.. centered::
-   *IMU handler FSM performing BNO055 reset, calibration load or manual calibration, calibration persistence, and steady state data readiness over I2C.*
-
-During initialization the task performs a reset sequence and brings up the I2C interface. It then checks for stored calibration data and loads it to avoid repeated manual calibration. If no valid calibration exists, it enters a manual calibration mode that monitors calibration status until completion, then saves the calibration blob for future boots. Once complete, the task remains in a steady state where inertial measurements can be sampled consistently and provided to the rest of the system through shared variables.
-
-Observer Task
--------------
-
-The observer task represents model based state estimation implemented in state space form. It runs concurrently with the control stack, using measured outputs and applied inputs to estimate internal states that are not directly measured or that benefit from filtering. The observer gain is selected using pole placement to achieve stable convergence behavior, and RK4 integration is used to propagate the state estimate forward in time under the discrete task period.
-
-.. image:: /images/observer_block.png
-   :width: 85%
-   :align: center
-
-.. centered::
-   *Observer structure showing state space estimation with Luenberger gain injection and RK4 integration under a discrete task period.*
-
-This task formalizes estimation as part of the architecture rather than ad hoc filtering. By publishing estimated states through shares, the observer output can be consumed by other tasks without changing their hardware interfaces, allowing estimation improvements to be integrated cleanly into navigation or control when required by the course segment or sensing constraints.
+.. IMU Handler Task
+.. ----------------
+..
+.. The IMU handler task represents inertial sensor management over I2C, including initialization, calibration management, and data readiness. It is responsible for bringing the IMU into a known operating mode and ensuring that usable heading or yaw rate information is available to other tasks. Calibration persistence is handled by loading a saved calibration blob when present, and saving new calibration data after a successful manual procedure so repeated runs can start quickly with consistent sensor behavior.
+..
+.. .. image:: /images/imu_handler_fsm.png
+..    :width: 90%
+..    :align: center
+..
+.. .. centered::
+..    *IMU handler FSM performing BNO055 reset, calibration load or manual calibration, calibration persistence, and steady state data readiness over I2C.*
+..
+.. During initialization the task performs a reset sequence and brings up the I2C interface. It then checks for stored calibration data and loads it to avoid repeated manual calibration. If no valid calibration exists, it enters a manual calibration mode that monitors calibration status until completion, then saves the calibration blob for future boots. Once complete, the task remains in a steady state where inertial measurements can be sampled consistently and provided to the rest of the system through shared variables.
+..
+.. Observer Task
+.. -------------
+..
+.. The observer task represents model based state estimation implemented in state space form. It runs concurrently with the control stack, using measured outputs and applied inputs to estimate internal states that are not directly measured or that benefit from filtering. The observer gain is selected using pole placement to achieve stable convergence behavior, and RK4 integration is used to propagate the state estimate forward in time under the discrete task period.
+..
+.. .. image:: /images/observer_block.png
+..    :width: 85%
+..    :align: center
+..
+.. .. centered::
+..    *Observer structure showing state space estimation with Luenberger gain injection and RK4 integration under a discrete task period.*
+..
+.. This task formalizes estimation as part of the architecture rather than ad hoc filtering. By publishing estimated states through shares, the observer output can be consumed by other tasks without changing their hardware interfaces, allowing estimation improvements to be integrated cleanly into navigation or control when required by the course segment or sensing constraints.
