@@ -57,10 +57,13 @@ The table below reports our official checkpoint timestamps recorded during the l
 .. raw:: html
 
    <div style="text-align:center; margin-top: 10px; margin-bottom: 10px;">
-     <video controls style="max-width: 900px; width: 100%; height: auto;">
-       <source src="_static/successful_run.mp4" type="video/mp4">
-       Your browser does not support the video tag.
-     </video>
+     <iframe width="900" height="506"
+             src="https://www.youtube.com/embed/gsIIfVX_UOE"
+             title="Successful Run"
+             frameborder="0"
+             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+             allowfullscreen>
+     </iframe>
    </div>
 
 .. centered::
