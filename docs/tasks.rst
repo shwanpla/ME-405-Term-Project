@@ -66,7 +66,7 @@ Closed-Loop Control Task
 
 The closed loop control task represents the velocity, line tracking, and turning control layer that generates drivetrain effort commands. Two instances run simultaneously, producing independent effort outputs for the left and right motor control tasks. The controller supports multiple operating modes so that navigation can switch between line following segments, forced straight segments, and heading based turns while preserving stable PI velocity regulation underneath.
 
-.. image:: /images/closed_loop_control_fsm.png
+.. image:: /images/CL_control_task_V5_fsm.png
    :width: 90%
    :align: center
 
