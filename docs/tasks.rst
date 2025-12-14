@@ -18,7 +18,7 @@ Task Diagram
 The task diagram represents the complete software architecture executed on the microcontroller during a run. Each box corresponds to a cooperative task implemented as a generator, and arrows represent the real time variables passed through task_share shares and queues. Low level tasks handle hardware interface and telemetry generation, mid level tasks implement control and estimation, and the top level navigation task coordinates the entire system by setting mode flags and setpoints rather than calling hardware directly. This separation is what allows Romi to run multiple subsystems simultaneously with deterministic timing while keeping the navigation logic readable and modular.
 
 .. image:: /images/task_diagram.png
-   :width: 100%
+   :width: 90%
    :align: center
 
 .. centered::
@@ -52,7 +52,7 @@ Motor Control Task
 
 The motor control task represents the lowest level actuation and wheel telemetry subsystem. Two identical instances run simultaneously, one for the left drivetrain and one for the right drivetrain. Each task is responsible for enabling the motor driver, applying the commanded PWM effort setpoint, updating encoder position and velocity at high rate, and publishing telemetry through shared variables so that closed loop control and estimation remain synchronized with the drivetrain.
 
-.. image:: /images/motor_control_fsm.png
+.. image:: /images/motor_ctrl_task_V3_fsm.png
    :width: 80%
    :align: center
 
@@ -67,7 +67,7 @@ Closed-Loop Control Task
 The closed loop control task represents the velocity, line tracking, and turning control layer that generates drivetrain effort commands. Two instances run simultaneously, producing independent effort outputs for the left and right motor control tasks. The controller supports multiple operating modes so that navigation can switch between line following segments, forced straight segments, and heading based turns while preserving stable PI velocity regulation underneath.
 
 .. image:: /images/CL_control_task_V5_fsm.png
-   :width: 90%
+   :width: 80%
    :align: center
 
 .. centered::
