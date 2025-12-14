@@ -1,30 +1,14 @@
 """
-ME 405 - Mechatronics
+Battery voltage monitoring module using ADC (Analog-to-Digital Converter).
 
-Authors: Billy Hawkins, Tarsem Pal, Arturo Ramirez
-
-Description:
-    Battery voltage monitoring module using ADC (Analog-to-Digital Converter).
-    Reads voltage directly from pin PC0 with configurable averaging and sampling.
-    Provides both class-based and convenience function interfaces for battery
-    voltage measurements.
-
-Classes:
-    BatteryMonitor - Configurable ADC voltage reader with averaging support
-
-Functions:
-    configure() - Optional configuration for default monitor settings
-    battery_voltage() - Quick access function to read current battery voltage
+Reads voltage directly from pin PC0 with configurable averaging and sampling.
+Provides both class-based and convenience function interfaces for battery
+voltage measurements.
 
 Hardware:
     - ADC Pin: PC0 (default, configurable)
     - Reference Voltage: 3.3V
     - Resolution: 12-bit ADC
-
-Dependencies:
-    - pyb.Pin
-    - pyb.ADC
-    - time
 
 Notes:
     - No voltage scaling applied; reads direct ADC voltage
