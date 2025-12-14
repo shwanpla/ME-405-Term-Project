@@ -10,7 +10,53 @@ This page defines the electrical interconnects used on Romi, including motor dri
 .. centered::
    *STM32 Nucleo pinout reference used to assign timer, ADC, I2C, and UART signals for the Romi wiring harness.*
 
+Nucleo Pin Constraints
+----------------------
 
+Several STM32 Nucleo pins are reserved for onboard functions such as ST-Link communication, USB, SWD programming, the user LED and button, and the 32 kHz oscillator. These pins were treated as unavailable during integration to preserve reliable REPL access, firmware flashing, and debugging support throughout development and testing.
+
+.. centered::
+   *Reserved Nucleo pins that were avoided to prevent conflicts with ST-Link, USB, SWD, onboard LED and button, and RTC oscillator functions.*
+
+Reserved pins not used in this project
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Nucleo Pin
+     - Arduino Label
+     - Reserved Function
+   * - PA2
+     - A2
+     - UART2 link to ST-Link interface
+   * - PA3
+     - A3
+     - UART2 link to ST-Link interface
+   * - PA5
+     - A5
+     - Onboard user LED
+   * - PA11
+     - A11
+     - USB interface signals through the shoe
+   * - PA12
+     - A12
+     - USB interface signals through the shoe
+   * - PA13
+     - A13
+     - SWD programming interface
+   * - PA14
+     - A14
+     - SWD programming interface
+   * - PC13
+     - C13
+     - User button input
+   * - PC14
+     - C14
+     - 32 kHz oscillator for RTC
+   * - PC15
+     - C15
+     - 32 kHz oscillator for RTC
 Motor Control
 -------------
 
