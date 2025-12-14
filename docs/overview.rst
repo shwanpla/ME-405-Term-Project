@@ -1,6 +1,7 @@
 Overview
 ========
 In ME 405 Mechatronics, our term project culminated in a fully integrated autonomous two wheeled differential drive robot named Romi, engineered for robust, repeatable obstacle course navigation. Our three person team delivered a complete mechatronic system that tightly couples embedded hardware, real time MicroPython firmware, task based scheduling, multi sensor instrumentation, and closed loop control with state estimation methods rooted in state space modeling and pole placement. The result is an autonomous robot system that demonstrates end to end capability in designing, integrating, and validating an embedded robotic solution, spanning electrical fabrication and mechanical sensor mounting through real time software architecture and navigation level decision logic.
+
 .. image:: /images/romi_isometric.png
    :width: 600px
    :align: center
