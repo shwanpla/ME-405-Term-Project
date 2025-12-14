@@ -22,4 +22,4 @@ The culminating deliverable of the term was a navigation task built specifically
    :align: center
 
 .. centered::
-   *Obstacle course top view used for time trials. The run begins at CP1 and proceeds through the numbered checkpoints in order. Dashed circles indicate optional bonus checkpoints worth minus 3 seconds each on the final runtime.*
+   *Obstacle course top view used for time trials. The run begins at CP#0 and proceeds through the numbered checkpoints in order until returning to CP#6. Dashed circles indicate optional bonus checkpoints worth minus 3 seconds each on the final runtime.*
