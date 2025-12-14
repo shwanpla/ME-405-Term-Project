@@ -183,7 +183,7 @@ Timing Breakdown
    * - Start → CP 1
      - 32.91
      - 32.91
-     - Straight line, right turn fork (Radius = ),
+     - Straight line, right turn fork (Radius = 200mm),
    * - CP 1 → CP 2
      - 58.00
      - 25.09
