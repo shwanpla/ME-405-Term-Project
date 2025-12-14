@@ -1,20 +1,30 @@
 """
-Bump Sensor Task - Monitors a bump sensor on Pin PC11
-Sets a share value to 1 once when the bump sensor is triggered (once per run)
+Bump sensor monitoring task for collision detection.
+
+Continuously polls a bump sensor on Pin PC11 and sets a shared flag when a collision
+is detected. Uses debouncing to prevent false triggers and only detects the first
+bump event per run.
+
+Hardware:
+    - Bump Sensor Pin: PC11 (active LOW, pull-up resistor enabled)
+    - Debounce Time: 30ms
+
+Notes:
+    - Sensor is active LOW (pressed = 0, released = 1)
+    - Only triggers once per run (bump_already_detected flag)
+    - Requires cotask scheduler to yield control
 """
 
 from pyb import Pin
 from time import sleep_ms
 
+
 def bump_sensor_task_fun(shares):
     """
-    Monitors the bump sensor and sets bump_detected_share to 1 once when triggered.
-    
-    Parameters:
-    -----------
-    shares : tuple
-        Contains:
-        - bump_detected_share: Share('B') that gets set to 1 when bump is detected
+    Cooperative task function that monitors bump sensor and updates shared state.
+
+    :param shares: Tuple containing bump_detected_share (Share object)
+    :type shares: tuple
     """
     (bump_detected_share,) = shares
     
