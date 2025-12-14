@@ -1,5 +1,35 @@
-# battery_adc.py
-# MicroPython helper to read direct ADC voltage from PC0 (no scaling)
+"""
+ME 405 - Mechatronics
+Authors: Billy Hawkins, Tarsem Pal, Arturo Ramirez
+Filename: battery_adc.py
+
+Description:
+    Battery voltage monitoring module using ADC (Analog-to-Digital Converter).
+    Reads voltage directly from pin PC0 with configurable averaging and sampling.
+    Provides both class-based and convenience function interfaces for battery
+    voltage measurements.
+
+Classes:
+    BatteryMonitor - Configurable ADC voltage reader with averaging support
+
+Functions:
+    configure() - Optional configuration for default monitor settings
+    battery_voltage() - Quick access function to read current battery voltage
+
+Hardware:
+    - ADC Pin: PC0 (default, configurable)
+    - Reference Voltage: 3.3V
+    - Resolution: 12-bit ADC
+
+Dependencies:
+    - pyb.Pin
+    - pyb.ADC
+    - time
+
+Notes:
+    - No voltage scaling applied; reads direct ADC voltage
+    - For battery monitoring, ensure voltage divider if battery > 3.3V
+"""
 
 from pyb import Pin, ADC
 import time
