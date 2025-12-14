@@ -1,69 +1,25 @@
 Overview
 ========
+In ME 405 Mechatronics, our term project culminated in a fully integrated autonomous two wheeled differential drive robot named Romi, engineered for robust, repeatable obstacle course navigation. Our three person team delivered a complete mechatronic system that tightly couples embedded hardware, real time MicroPython firmware, task based scheduling, multi sensor instrumentation, and closed loop control with state estimation methods rooted in state space modeling and pole placement. The result is an autonomous robot system that demonstrates end to end capability in designing, integrating, and validating an embedded robotic solution, spanning electrical fabrication and mechanical sensor mounting through real time software architecture and navigation level decision logic.
 
 .. image:: /images/romi_isometric.png
    :width: 600px
    :align: center
 
-Project Summary
----------------
+.. centered::
+   *Romi isometric view highlighting the integrated chassis layout and sensor mounting geometry used for autonomous navigation.*
 
-This documentation covers the complete design and implementation of an **autonomous obstacle course navigation system** for a Romi robot using the NUCLEO-L476RG microcontroller.
+Our development process emphasized modularity and verification at every layer. We implemented reusable drivers for motor actuation, encoder measurement, timed ADC acquisition, I2C based IMU communication, and serial and Bluetooth connectivity, then composed higher level behaviors using generator based tasks and shared data interfaces under a cooperative scheduler. This structure enabled deterministic update rates, clean separation between sensing, control, and decision making, and an efficient tuning workflow based on repeatable trials and telemetry.
 
-**Repository**: `Romi Navigation GitHub <https://github.com/shwanpla/ME-405-Term-Project>`_
+Our software stack was designed to be modular, readable, and scalable from early bring up through final navigation. We implemented structured MicroPython code using functions for reusable logic, classes for hardware drivers and interfaces, and generator based tasks to enforce periodic execution of each subsystem. Each task exposed a clear input output boundary through shared variables, allowing sensing, estimation, control, and navigation to run concurrently with deterministic timing under a cooperative scheduler. This architecture supported incremental integration and debugging, made it straightforward to tune control gains and thresholds using telemetry, and allowed the navigation layer to remain clean by commanding behavior through well defined subsystem tasks rather than direct low level hardware calls.
 
-The robot autonomously navigates a 24-state obstacle course using:
+Our hardware work focused on building a reliable, serviceable robot suitable for repeated trials. We produced wiring harnesses with custom crimps and headers, maintained clean routing, and completed soldered circuitry to support stable analog measurement and battery monitoring. Mechanical integration was reinforced with CAD and 3D printed fixtures that controlled sensor geometry, including mounts that set the IR sensor array height relative to the ground to improve reflectance contrast and measurement consistency.
 
-- **Encoder-based odometry** for distance and heading tracking
-- **IR line sensors** for obstacle detection and steering
-- **Bump sensor** for collision recovery
-- **Dual closed-loop motor controllers** for precise speed and heading control
-- **Multi-task scheduler** coordinating 8 concurrent tasks
+The culminating deliverable of the term was a navigation task built specifically for a unique obstacle course with distinct features and decision points. The final live demonstration was traversing the entire course across multiple trials, which required Romi to seamlessly switch between behaviors such as line following, straight segments, distance based motion, controlled turns, and bump response while maintaining stable closed loop motor control underneath. By combining calibrated sensing and state information with structured decision logic, our navigation layer executed repeatable maneuver commands and made consistent path choices through the course obstacles rather than relying on a one off run. Together, these pages document the final robot and codebase and provide evidence of our capability to build a multi skilled autonomous system through disciplined embedded software, controls, and full stack integration.
 
-**Key Achievement**: Successfully completes the obstacle course in ~90-100 seconds with >95% reliability, including automated recovery from wall collisions.
+.. image:: /images/Obstacle_Course.png
+   :width: 900px
+   :align: center
 
-What's Inside
--------------
-
-**Overview** - High-level project goals and system architecture
-
-**Hardware** - Robot platform, motors, encoders, and sensor specifications
-
-**Wiring** - Complete pinout and electrical connections for all components
-
-**Tasks** - Detailed breakdown of 8 concurrent tasks with flow diagrams showing:
-   - Motor control and regulation
-   - Closed-loop steering and heading stabilization
-   - Encoder odometry calculations
-   - Navigation state machine (24 states)
-   - Bump sensor collision handling
-   - Bluetooth telemetry
-
-**Source Code** - File organization, key design patterns, and code examples
-
-**Alternative Approaches** - Design decisions: what was tried, what failed, and why current solutions were chosen
-
-**Analysis** - Performance metrics, error analysis, sensor performance, and optimization opportunities
-
-**Time Trials** - Actual run data with timing breakdowns, variability analysis, and energy consumption
-
-Project Goal
------------
-
-Develop a fully autonomous robot capable of navigating a complex obstacle course without human intervention, recovering from unexpected collisions, and completing the course reliably within a reasonable time frame.
-
-System Architecture
-------------------
-
-The system uses a **multi-task real-time scheduler** with 8 concurrent tasks:
-
-- **Motor Tasks** (12ms): Direct PWM control and velocity feedback
-- **Control Tasks** (20ms): PI velocity and heading regulation
-- **Encoder Task** (50ms): Odometry calculation from wheel encoders
-- **Navigation Task** (50ms): 24-state obstacle course state machine
-- **Serial Task** (150ms): Bluetooth communication and telemetry
-- **Bump Sensor Task** (20ms): Collision detection
-
-The navigation task sends high-level commands (velocity, heading) to the motor controllers while continuously monitoring sensors for obstacles and state transitions. This separation allows smooth, responsive control without blocking on decision logic.
-
-**Key Innovation**: Instant heading capture on turn-to-straight transitions eliminates overshoot and provides instantaneous state changes without waiting for motor adjustment.
+.. centered::
+   *Obstacle course top view used for time trials. The run begins at CP#0 and proceeds through the numbered checkpoints in order until returning to CP#6. Dashed circles indicate optional bonus checkpoints worth minus 3 seconds each on the final runtime.*
