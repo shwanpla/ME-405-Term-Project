@@ -302,22 +302,22 @@ The robot progresses through distinct course sections, each with distance target
 
 .. code-block:: python
 
-   State 0:  Line follow (bias=0)          → 650 mm
-   State 1:  Fork quarter-circle (bias=1.55) → 914 mm
-   State 2:  Turn to heading -90°
-   State 3:  Straight at -90°            → 1114 mm (diamond section)
-   State 4:  U-turn semicircle            → 1742 mm
-   State 5:  Turn to heading 90°
-   State 6:  Straight at 90°              → 1992 mm (parking garage)
-   State 7:  Fork quarter-circle (bias=1.8) → 2227 mm
-   State 8:  Complex 2× quarter-circles   → 3549 mm
-   State 9:  Turn to heading 180°
-   State 10: Straight at 180°             → 3849 mm
-   State 11: Line follow (bias=0.2)       → 4099 mm
-   State 12: Turn to heading 180°
-   State 13: Straight through parking     → 4799 mm
-   State 14: Turn to heading 90°
-   State 15: Straight until bump or      → 5149 mm
+   State 0:  Line follow (bias=0)          to 650 mm
+   State 1:  Fork quarter-circle (bias=1.55) to 914 mm
+   State 2:  Turn to heading -90 deg
+   State 3:  Straight at -90 deg          to 1114 mm (diamond section)
+   State 4:  U-turn semicircle            to 1742 mm
+   State 5:  Turn to heading 90 deg
+   State 6:  Straight at 90 deg           to 1992 mm (parking garage)
+   State 7:  Fork quarter-circle (bias=1.8) to 2227 mm
+   State 8:  Complex 2x quarter-circles   to 3549 mm
+   State 9:  Turn to heading 180 deg
+   State 10: Straight at 180 deg          to 3849 mm
+   State 11: Line follow (bias=0.2)       to 4099 mm
+   State 12: Turn to heading 180 deg
+   State 13: Straight through parking     to 4799 mm
+   State 14: Turn to heading 90 deg
+   State 15: Straight until bump or       to 5149 mm
 
 Wall Recovery Sequence (States 16–23)
 """"""""""""""""""""""""""""""""""""""
@@ -327,13 +327,13 @@ When bump sensor detects collision during State 15:
 .. code-block:: python
 
    State 16: Back up 50 mm
-   State 17: Turn to heading 0°
-   State 18: Go straight 175 mm at 0°
-   State 19: Turn to heading 90°
-   State 20: Go straight 200 mm at 90°
-   State 21: Turn to heading 180°
+   State 17: Turn to heading 0 deg
+   State 18: Go straight 175 mm at 0 deg
+   State 19: Turn to heading 90 deg
+   State 20: Go straight 200 mm at 90 deg
+   State 21: Turn to heading 180 deg
    State 22: Line follow 200 mm (bias=0)
-   State 23: STOP — course complete
+   State 23: STOP - course complete
 
 Configuration Parameters
 ------------------------
@@ -363,7 +363,7 @@ Heading Targets (degrees)
    HEADING_NEG_90   = -90.0       # Diamond section heading
    HEADING_90       = 90.0        # Parking garage heading
    HEADING_180      = 180.0       # Return path heading
-   HEADING_TOLERANCE = 4.0        # ±4° acceptance band
+   HEADING_TOLERANCE = 4.0        # +/- 4 deg acceptance band
 
 Control Modes
 """""""""""""
@@ -481,8 +481,8 @@ Odometry Notes
 """"""""""""""
 
 - Positive heading = counter-clockwise rotation (left turn)
-- Heading normalized to [-180, 180]° range
-- Heading unwrapping prevents jumps at ±180° boundary
+- Heading normalized to [-180, 180] deg range
+- Heading unwrapping prevents jumps at +/- 180 deg boundary
 - Distance accumulation provides cumulative traveled distance
 
 --------
