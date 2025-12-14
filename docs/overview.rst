@@ -19,4 +19,4 @@ The culminating deliverable of the term was a navigation task built specifically
    :width: 900px
    :align: center
 
-   *Obstacle course top view. Dotted circles indicate optional checkpoints that can be skipped to reduce runtime, but each missed checkpoint applies a 3 second penalty to the final time.*
+  *Obstacle course top view. The run begins at CP1 and proceeds through the numbered checkpoints in order. Dashed circles indicate optional bonus checkpoints that subtract 3 seconds from the final timed run.*
