@@ -1,6 +1,8 @@
 """
 ME 405 - Mechatronics
+
 Authors: Billy Hawkins, Tarsem Pal, Arturo Ramirez
+
 Filename: battery_adc.py
 
 Description:

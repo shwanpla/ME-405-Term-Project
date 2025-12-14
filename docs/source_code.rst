@@ -9,6 +9,8 @@ This section provides detailed API documentation for each source code module, au
 Battery ADC Module
 ~~~~~~~~~~~~~~~~~~
 
+The battery ADC module provides voltage monitoring functionality using the microcontroller's analog-to-digital converter. It reads voltage directly from pin PC0 with configurable averaging to reduce noise. The module offers both a class-based interface for custom configurations and convenience functions for quick voltage readings.
+
 .. automodule:: battery_adc
    :members:
    :undoc-members:
