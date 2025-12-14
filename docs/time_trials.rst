@@ -75,7 +75,7 @@ Summary
    - Checkpoint 4 (Garage Entry): 100.53s
    - Checkpoint 5 (Garage Exit): 123.93s
    - Checkpoint 6 (Wall Interaction): 165.72s
-   - **Official Time: 165.72 seconds** (no bonuses)
+   - Finish time: **165.72 seconds** (no cup bonuses)
 
 Key Observations
 ----------------
@@ -83,7 +83,7 @@ Key Observations
 **Trials 1 & 2 - Checkpoint 4 Failure**:
 
 Both early trials failed at checkpoint 4 (garage entry):
-- Heading control unstable in narrow corridor
+- Heading control unstable in corridor
 - Robot drifted into wall or overcorrected into opposite wall
 - Never reached checkpoint 5
 - Consistent failure point indicates systematic control issue at this location
@@ -122,9 +122,9 @@ No cups were collected in any trial:
 Failure Analysis
 ----------------
 
-**Checkpoint 4: The Unresolved Problem**
+**The Garage Sequence: The Unresolved Problem**
 
-Trials 1 & 2 failed at checkpoint 4 (garage entry). Trial 3 used the **same code** but didn't fail - this means:
+Trials 1 & 2 failed between checkpoint 4 and 5 (garage). Trial 3 used the **same code** but didn't fail - this means:
 
 1. **The Problem Wasn't Fixed**: No code changes were made between trials
 2. **The Code is Unreliable**: It fails sometimes, passes sometimes, with identical logic
@@ -133,7 +133,7 @@ Trials 1 & 2 failed at checkpoint 4 (garage entry). Trial 3 used the **same code
 
 **What's Actually Happening at Checkpoint 4**:
 
-The garage entry (CP 4) requires precise heading control in a narrow corridor. The code's heading control strategy:
+The garage entry (CP 4) requires precise heading control in a corridor. The code's heading control strategy:
 - Either drifts too much (hits wall)
 - Or corrects too aggressively (oscillates and hits opposite wall)
 - Or sometimes finds the balance purely by chance
@@ -154,9 +154,9 @@ Performance Problems
 
 From Trial 1 to Trial 3:
 
-- **Trial 1**: Failed at CP 4 (heading control lost)
-- **Trial 2**: Failed at CP 4 (same heading control issue)
-- **Trial 3**: Passed CP 4 by chance, but code is still broken
+- **Trial 1**: Failed after CP 4 (heading control lost)
+- **Trial 2**: Failed after CP 4 (same heading control issue)
+- **Trial 3**: Passed through the garage, completed entire course
 
 **No Actual Improvements**:
 
@@ -164,11 +164,10 @@ From Trial 1 to Trial 3:
 - Same heading control algorithm
 - Same motor balance issues
 - Trial 3 success is luck, not improvement
-- **Expected next run**: Likely to fail at CP 4 again
 
 **The Real Issue**:
 
-The checkpoint 4 garage problem is **not solved**. The code needs:
+The checkpoint 4 garage problem is not solved. The code needs:
 - Fundamentally different heading control strategy
 - Better motor symmetry handling
 - Wider tolerance or different approach to narrow corridors
@@ -215,7 +214,7 @@ Timing Breakdown
 
 The parking garage (18.21s + 23.40s = 41.61s total) accounts for 41.61/165.72 = 25% of total time:
 - Most technically difficult section
-- Narrow corridor with walls on both sides
+- Narrow corridor with pillars on both sides
 - Requires constant heading maintenance at 180°
 - Motor balance critical - any asymmetry causes wall contact
 - **Trials 1 & 2 never made it past CP 4 entry**
@@ -252,3 +251,40 @@ Recommendations for Future Runs
 - **Monitor Motor Health**: Check bearing friction - impacts garage performance significantly
 - **Heading Tolerance Tuning**: May be able to tighten tolerance in open sections while keeping loose tolerance in garage
 - **Bump Recovery Optimization**: Once garage is reliable, could optimize CP 5→6 wall interaction for bonus points
+
+Future Speed Optimization Plan
+-------------------------------
+
+To achieve faster trial times, the following major improvements are needed:
+
+**1. Increase Overall Speed**
+   - Higher motor duty cycles throughout the course
+   - Requires redesigning the scheduler task timing and tuples
+   - Need to ensure control loop runs fast enough for increased speeds
+
+**2. Optimize IR Sensor Readings**
+   - Current IR sensor polling may be limiting responsiveness
+   - Reduce sensor read latency
+   - Improve sensor data processing efficiency
+   - Consider faster sampling rates or interrupt-driven updates
+
+**3. Retune Closed-Loop Control**
+   - Current control gains optimized for slower speeds
+   - Higher speeds will require re-tuning PID/heading control parameters
+   - May need increased gains to handle faster dynamics
+   - Test stability margins at higher speeds
+
+**4. Scheduler and Timing Restructure**
+   - Revisit task scheduling periods (tuples)
+   - Ensure all critical tasks (motor control, sensor reads, heading control) run fast enough
+   - Balance computation load across tasks
+   - May need to reduce lower-priority task frequencies
+
+**Implementation Priority**:
+   1. Profile current scheduler performance and identify bottlenecks
+   2. Optimize IR sensor read cycle
+   3. Increase speed incrementally while monitoring control stability
+   4. Retune closed-loop controllers at each speed increment
+   5. Final full-speed validation run
+
+**Risk**: Higher speeds increase the severity of control failures, especially in tight spaces like the garage corridor. Thorough testing required.
