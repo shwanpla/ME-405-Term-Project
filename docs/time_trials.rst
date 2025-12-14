@@ -188,7 +188,7 @@ Timing Breakdown
    * - Start → CP 1
      - 32.91
      - 32.91
-     - Initial obstacles
+     - Straight line, right turn fork (Radius = ),
    * - CP 1 → CP 2
      - 58.00
      - 25.09
