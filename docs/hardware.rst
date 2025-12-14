@@ -73,7 +73,7 @@ The embedded compute core is an STM32 Nucleo board used as the real time MicroPy
    * - UART / serial
      - Telemetry, command interface, and debugging output
 
-.. image:: /images/nucleo_controller.png
+.. image:: /images/NUCLEO-L476RG.png
    :width: 650px
    :align: center
 
@@ -180,27 +180,3 @@ A bumper switch assembly provides event detection for wall contact and collision
 .. centered::
    *Bump sensor assembly providing a discrete event trigger used by navigation for contact response and recovery.*
 
-Power and Battery Monitoring
-----------------------------
-
-Power integrity and voltage awareness were supported by a custom voltage divider soldered for ADC based battery monitoring. This measurement is used to scale motor commands to the available supply and to protect repeatability as battery state changes during multi run testing.
-
-.. list-table:: Power and monitoring features
-   :header-rows: 1
-   :widths: 35 65
-
-   * - Hardware
-     - Technical role in the system
-   * - Battery supply
-     - Primary energy source for motors and embedded electronics
-   * - Voltage divider
-     - Conditions battery voltage to a safe ADC input range
-   * - ADC sampling
-     - Enables runtime voltage measurement for scaling and diagnostics
-
-.. image:: /images/battery_divider_adc.png
-   :width: 700px
-   :align: center
-
-.. centered::
-   *Soldered voltage divider and ADC wiring used to monitor battery voltage during autonomous operation.*
