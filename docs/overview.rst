@@ -6,7 +6,7 @@ In ME 405 Mechatronics, our term project culminated in a fully integrated autono
    :align: center
 
 .. centered::
-   *Romi isometric view highlighting the integrated chassis layout and sensor mounting geometry used for autono
+   *Romi isometric view highlighting the integrated chassis layout and sensor mounting geometry used for autonomous navigation.*
 
 Our development process emphasized modularity and verification at every layer. We implemented reusable drivers for motor actuation, encoder measurement, timed ADC acquisition, I2C based IMU communication, and serial and Bluetooth connectivity, then composed higher level behaviors using generator based tasks and shared data interfaces under a cooperative scheduler. This structure enabled deterministic update rates, clean separation between sensing, control, and decision making, and an efficient tuning workflow based on repeatable trials and telemetry.
 
