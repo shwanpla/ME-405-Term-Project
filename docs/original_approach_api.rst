@@ -11,7 +11,7 @@ Observer Module
 
 State-space dynamics and output equations implementing the 6-state kinematic observer with IMU fusion.
 
-.. automodule:: original-approach.observer_fcn
+.. automodule:: original_approach.observer_fcn
    :members:
    :undoc-members:
    :show-inheritance:
@@ -21,7 +21,7 @@ RK4 Solver
 
 4th-order Runge-Kutta numerical integrator for propagating the state estimate forward in time.
 
-.. automodule:: original-approach.RK4_solver
+.. automodule:: original_approach.RK4_solver
    :members:
    :undoc-members:
    :show-inheritance:
@@ -31,7 +31,7 @@ IMU Driver
 
 Bit-banged I²C implementation for communicating with the BNO055 IMU sensor, including bus recovery and retry logic.
 
-.. automodule:: original-approach.IMU_driver
+.. automodule:: original_approach.IMU_driver
    :members:
    :undoc-members:
    :show-inheritance:
@@ -41,7 +41,7 @@ Calibration Manager
 
 Persistent storage and retrieval of BNO055 calibration blob to avoid repeated manual calibration across power cycles.
 
-.. automodule:: original-approach.CalibrationManager
+.. automodule:: original_approach.CalibrationManager
    :members:
    :undoc-members:
    :show-inheritance:
@@ -51,7 +51,7 @@ IMU Handler Task
 
 Startup finite state machine managing IMU initialization, calibration loading, manual calibration, and readiness signaling.
 
-.. automodule:: original-approach.IMU_handler
+.. automodule:: original_approach.IMU_handler
    :members:
    :undoc-members:
    :show-inheritance:
@@ -61,7 +61,7 @@ Navigation (Original)
 
 Position-based navigation logic using global X, Y coordinates from the observer and IMU heading for state transitions.
 
-.. automodule:: original-approach.navigation_original
+.. automodule:: original_approach.navigation_original
    :members:
    :undoc-members:
    :show-inheritance:
@@ -71,7 +71,7 @@ Main (Original)
 
 Task coordination and cooperative scheduler setup for the original approach.
 
-.. automodule:: original-approach.main_original
+.. automodule:: original_approach.main_original
    :members:
    :undoc-members:
    :show-inheritance:

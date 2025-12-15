@@ -197,7 +197,7 @@ This approach combined sensor fusion with line following to handle multi-segment
 Reference Implementation
 -------------------------
 
-The complete original implementation is preserved in :code:`src/original-approach/` and includes:
+The complete original implementation is preserved in :code:`src/original_approach/` and includes:
 
 - :code:`observer_fcn.py` — State-space dynamics and output equations
 - :code:`RK4_solver.py` — 4th-order Runge-Kutta integrator
