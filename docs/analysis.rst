@@ -121,6 +121,15 @@ This ensured consistent sensor performance across power cycles.
 IMU Handler Task and Startup FSM
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The IMU handler task represents inertial sensor management over I2C, including initialization, calibration management, and data readiness. It is responsible for bringing the IMU into a known operating mode and ensuring that usable heading or yaw rate information is available to other tasks. Calibration persistence is handled by loading a saved calibration blob when present, and saving new calibration data after a successful manual procedure so repeated runs can start quickly with consistent sensor behavior.
+
+.. image:: /images/imu_handler_fsm.png
+   :width: 90%
+   :align: center
+
+.. centered::
+   *IMU handler FSM performing BNO055 reset, calibration load or manual calibration, calibration persistence, and steady state data readiness over I2C.*
+
 A dedicated startup task managed the full IMU initialization and calibration sequence as a finite state machine:
 
 1. **Hardware Reset**: Toggle the IMU reset pin
@@ -129,6 +138,8 @@ A dedicated startup task managed the full IMU initialization and calibration seq
 4. **Manual Calibration**: Enter calibration mode if needed
 5. **Calibration Save**: Persist new calibration data
 6. **Ready State**: Enable navigation and observer tasks
+
+During initialization the task performs a reset sequence and brings up the I2C interface. It then checks for stored calibration data and loads it to avoid repeated manual calibration. If no valid calibration exists, it enters a manual calibration mode that monitors calibration status until completion, then saves the calibration blob for future boots. Once complete, the task remains in a steady state where inertial measurements can be sampled consistently and provided to the rest of the system through shared variables.
 
 This encapsulated all IMU readiness concerns into a single subsystem, preventing downstream tasks from running until the sensor was fully operational.
 
@@ -141,6 +152,20 @@ After calibration, a periodic task extracted:
 - Yaw rate (angular velocity)
 
 These values were published to shared variables consumed by the controller and navigation tasks.
+
+Observer Task
+~~~~~~~~~~~~~
+
+The observer task represents model based state estimation implemented in state space form. It runs concurrently with the control stack, using measured outputs and applied inputs to estimate internal states that are not directly measured or that benefit from filtering. The observer gain is selected using pole placement to achieve stable convergence behavior, and RK4 integration is used to propagate the state estimate forward in time under the discrete task period.
+
+.. image:: /images/observer_block.png
+   :width: 85%
+   :align: center
+
+.. centered::
+   *Observer structure showing state space estimation with Luenberger gain injection and RK4 integration under a discrete task period.*
+
+This task formalizes estimation as part of the architecture rather than ad hoc filtering. By publishing estimated states through shares, the observer output can be consumed by other tasks without changing their hardware interfaces, allowing estimation improvements to be integrated cleanly into navigation or control when required by the course segment or sensing constraints.
 
 Navigation with State Estimation
 ---------------------------------
@@ -181,6 +206,9 @@ The complete original implementation is preserved in :code:`src/original-approac
 - :code:`IMU_handler.py` — Startup FSM and initialization
 - :code:`navigation_original.py` — Position-based navigation logic
 - :code:`main_original.py` — Task coordination and scheduler setup
+
+.. seealso::
+   Full API documentation for these modules is available in :doc:`original_approach_api`.
 
 =============================
 Issues Encountered and Pivot to Displacement-Based Approach
