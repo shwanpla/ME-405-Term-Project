@@ -932,4 +932,304 @@ RK4 Performance Notes
 Main (Original)
 ---------------
 
+Main program for the original IMU-based obstacle course navigation robot. This implementation uses BNO055 IMU for heading estimation combined with encoder-based state observation, implementing cooperative multitasking with IMU calibration, observer-based state estimation, and navigation control.
+
 .. automodule:: defunct_main
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+System Architecture
+"""""""""""""""""""
+
+The main program coordinates seven cooperative tasks using the cotask scheduler:
+
+1. **IMU Calibration Task** (Priority 7, One-time)
+   - Runs at startup to initialize and calibrate BNO055 IMU
+   - Loads calibration from file if available
+   - Performs manual calibration if needed
+   - Period: 50ms (runs until calibration complete)
+
+2. **IMU Monitor Task** (Priority 3, Period 70ms)
+   - Continuously reads heading and yaw rate from IMU
+   - Implements heading unwrapping for continuous values
+   - Provides sensor data to observer and navigation tasks
+
+3. **Observer Task** (Priority 5, Period 100ms)
+   - Fuses IMU heading with encoder velocity data
+   - Uses RK4 numerical integration for state estimation
+   - Outputs global X, Y position and heading estimates
+
+4. **Velocity Control Task** (Priority 2, Period 12ms)
+   - Updates motor PWM based on control effort
+   - Fastest task for responsive motor control
+   - Applies setpoints from closed-loop controllers
+
+5. **Closed Loop Control Task** (Priority 4, Period 20ms)
+   - PI velocity control for both motors
+   - Implements line following with IR sensor array
+   - Coordinates heading control and bias adjustments
+
+6. **Navigation Task** (Priority 6, Period 100ms)
+   - 5-state finite state machine for course navigation
+   - Position-based state transitions using observer estimates
+   - Coordinates line following, turns, and straight segments
+
+7. **Serial Communication Task** (Priority 1, Period 200ms)
+   - Handles terminal commands and status output
+   - Lowest priority for non-critical communication
+
+Hardware Configuration
+""""""""""""""""""""""
+
+**Motors and Encoders:**
+
+.. code-block:: python
+
+   # Left motor on pins PC1 (direction), PA0 (PWM), timer 5 channel 1
+   left_motor = motor_driver(Pin.cpu.C1, Pin.cpu.A0, Timer(5, freq=20_000), 1)
+
+   # Right motor on pins PA10 (direction), PC7 (PWM), timer 3 channel 2
+   right_motor = motor_driver(Pin.cpu.A10, Pin.cpu.C7, Timer(3, freq=20_000), 2)
+
+   # Left encoder on pins PB6, PB7 (timer 4)
+   left_encoder = Encoder(Pin.cpu.B6, Pin.cpu.B7, 4)
+
+   # Right encoder on pins PC6, PC7 (timer 8)
+   right_encoder = Encoder(Pin.cpu.C6, Pin.cpu.C7, 8)
+
+**IR Sensor Array:**
+
+.. code-block:: python
+
+   # 7 IR reflectance sensors for line detection
+   ir_pins = [Pin.cpu.A4, Pin.cpu.A5, Pin.cpu.A6, Pin.cpu.A7,
+              Pin.cpu.B0, Pin.cpu.B1, Pin.cpu.C4]
+   ir_sensors = [pyb.ADC(pin) for pin in ir_pins]
+
+**IMU Sensor:**
+
+.. code-block:: python
+
+   # BNO055 9-DOF IMU on software I2C
+   # SCL: Pin B13, SDA: Pin B14, Reset: Pin B15
+   # I2C Address: 0x28 (default)
+
+**Robot Physical Parameters:**
+
+- **Wheel Diameter**: 70mm (radius = 35mm)
+- **Track Width**: 141mm
+- **Encoder Resolution**: 1437.1 ticks/revolution
+- **Wheel Circumference**: 0.2199 m
+
+Task Timing and Priorities
+"""""""""""""""""""""""""""
+
+The task scheduler executes tasks based on priority (higher number = higher priority) and period:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 15 15 40
+
+   * - Task Name
+     - Priority
+     - Period (ms)
+     - Function
+   * - IMU Calibration
+     - 7
+     - 50
+     - One-time startup calibration
+   * - Navigation
+     - 6
+     - 100
+     - Position-based state machine
+   * - Observer
+     - 5
+     - 100
+     - State estimation with RK4
+   * - Closed Loop Control
+     - 4
+     - 20
+     - PI velocity control
+   * - IMU Monitor
+     - 3
+     - 70
+     - Heading/yaw rate reading
+   * - Velocity Control
+     - 2
+     - 12
+     - Motor PWM update
+   * - Serial Communication
+     - 1
+     - 200
+     - Terminal I/O
+
+Shared Variables
+""""""""""""""""
+
+The system uses 28 shared variables for inter-task communication:
+
+**Sensor Measurements:**
+
+- ``meas_heading_share``: IMU heading (degrees, continuous)
+- ``meas_yaw_rate_share``: IMU yaw rate (deg/s)
+- ``left_enc_pos``: Left encoder position (ticks)
+- ``right_enc_pos``: Right encoder position (ticks)
+- ``left_enc_speed``: Left encoder velocity (ticks/us)
+- ``right_enc_speed``: Right encoder velocity (ticks/us)
+
+**Observer Outputs:**
+
+- ``big_X_share``: Global X position estimate (mm)
+- ``big_Y_share``: Global Y position estimate (mm)
+- ``obs_heading_share``: Observer heading estimate (degrees)
+- ``obs_yaw_rate_share``: Observer yaw rate estimate (deg/s)
+- ``initial_heading_share``: Initial heading reference (degrees)
+
+**Motor Control:**
+
+- ``left_set_point``: Left motor control effort
+- ``right_set_point``: Right motor control effort
+- ``left_desired_vel``: Left motor velocity setpoint
+- ``right_desired_vel``: Right motor velocity setpoint
+- ``left_controller_share``: Left motor PI controller object
+- ``right_controller_share``: Right motor PI controller object
+
+**Navigation Flags:**
+
+- ``line_follow_flg``: Enable line following (0/1)
+- ``force_straight_flg``: Force straight mode (0/1)
+- ``nav_turn_flg``: Enable heading-based turning (0/1)
+- ``nav_stop_flg``: Stop navigation (0/1)
+- ``nav_rest_flg``: Navigation rest flag
+- ``bias_share``: Line following bias (-3 to +3)
+- ``bias_timer_flg``: Bias timer flag
+
+**System Control:**
+
+- ``observer_calibration_flg``: Observer calibration trigger (0/1)
+- ``calibration_flg``: System calibration status (0-3)
+- ``end_flg``: End flag for debugging output
+- ``imu_share``: IMU object share (BNO055 instance)
+
+Startup Sequence
+""""""""""""""""
+
+The main program follows this initialization sequence:
+
+1. **Hardware Initialization**:
+   - Configure motor drivers with PWM timers
+   - Initialize encoders with position and velocity tracking
+   - Set up IR sensor array for line detection
+   - Configure IMU reset pin (B15)
+
+2. **Shared Variable Creation**:
+   - Create all 28 shared variables for inter-task communication
+   - Initialize controller objects (PI for velocity control)
+
+3. **Task Creation**:
+   - Create 7 cooperative tasks with cotask.Task()
+   - Assign priorities and periods for each task
+   - Add all tasks to cotask.task_list
+
+4. **Scheduler Execution**:
+   - Run cotask.task_list.pri_sched() in infinite loop
+   - Tasks yield control based on period and priority
+   - Handle KeyboardInterrupt for graceful shutdown
+
+Control Flow Example
+""""""""""""""""""""
+
+A typical control cycle showing task coordination:
+
+.. code-block:: text
+
+   Time 0ms:
+   ├─ Velocity Control (12ms task)
+   │  └─ Apply motor PWM based on left/right_set_point
+
+   Time 20ms:
+   ├─ Closed Loop Control (20ms task)
+   │  ├─ Read IR sensors for line position
+   │  ├─ Calculate line following error with bias
+   │  ├─ Run PI velocity controllers
+   │  └─ Update left/right_set_point
+
+   Time 70ms:
+   ├─ IMU Monitor (70ms task)
+   │  ├─ Read heading from BNO055
+   │  ├─ Apply heading unwrapping
+   │  └─ Update meas_heading_share
+
+   Time 100ms:
+   ├─ Observer (100ms task)
+   │  ├─ Read IMU heading and encoder velocities
+   │  ├─ Run RK4 integration (10ms steps over 100ms)
+   │  └─ Update big_X_share, big_Y_share, obs_heading_share
+   │
+   ├─ Navigation (100ms task)
+   │  ├─ Read X, Y position from observer
+   │  ├─ Check position thresholds for state transitions
+   │  ├─ Update line_follow_flg, bias_share based on state
+   │  └─ Set desired_angle_share for heading control
+
+Terminal Commands
+"""""""""""""""""
+
+**Connecting to Board:**
+
+.. code-block:: bash
+
+   # List available USB serial devices (macOS/Linux)
+   ls /dev/tty.*
+
+   # Connect using screen (115200 baud)
+   screen /dev/tty.usbmodem205F379C39472 115200
+
+   # Exit screen session
+   # Press: Ctrl-A, then K, then Y
+
+**Board Commands:**
+
+.. code-block:: python
+
+   # Soft reset the board
+   # Press: Ctrl-D
+
+   # Hard interrupt (KeyboardInterrupt)
+   # Press: Ctrl-C
+
+Memory Management
+"""""""""""""""""
+
+The program includes memory management for MicroPython:
+
+.. code-block:: python
+
+   import gc
+   gc.collect()  # Run garbage collection periodically
+
+This helps prevent memory fragmentation during long-running operation.
+
+Differences from Final Implementation
+""""""""""""""""""""""""""""""""""""""
+
+This original approach was replaced by the displacement-based odometry system. Key differences:
+
+**Original (defunct) Approach:**
+
+- Uses BNO055 IMU for absolute heading measurement
+- Observer fuses IMU heading with encoder data via RK4 integration
+- Global X, Y position estimation from sensor fusion
+- Position-based navigation with coordinate thresholds
+- More complex state estimation with 6-state observer
+
+**Final Approach:**
+
+- Pure encoder-based odometry (no IMU)
+- Displacement calculation from encoder ticks
+- Simpler state estimation without sensor fusion
+- Distance-based navigation (no global coordinates)
+- Reduced complexity and improved reliability
+
+See :doc:`analysis` for the technical rationale behind this architectural change, including IMU communication issues that motivated the switch to encoder-only estimation.
