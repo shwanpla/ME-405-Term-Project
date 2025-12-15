@@ -438,29 +438,45 @@ Hardware Constants
    MM_PER_TICK = 0.153            # Millimeters per encoder tick
 
 Odometry Calculations
-"""""""""""""""""""""""""""
+"""""""""""""""""""""
 
-**Distance Traveled**
+Hardware Constants
+------------------
+WHEEL_RADIUS_MM = 35.0       # Wheel radius in millimeters
+TICKS_PER_REV  = 1437.1      # Encoder ticks per wheel revolution
+TRACK_WIDTH_MM = 141.0       # Distance between left and right wheels
+WHEEL_CIRC_MM  = 220.0       # Wheel circumference (2πr)
+MM_PER_TICK    = 0.153       # Millimeters per encoder tick
 
-.. math::
 
-   \mathrm{distance} = \frac{\text{\texttt{left\_ticks}} + \text{\texttt{right\_ticks}}}{2.0} \times \text{\texttt{MM\_PER\_TICK}}
-
-Average of both encoders smooths odometry error and provides forward displacement in millimeters.
-
-**Heading Angle**
-
-.. math::
-
-   	ext{\texttt{tick\_diff}} = \text{\texttt{left\_ticks}} - \text{\texttt{right\_ticks}}
+Distance Traveled
+-----------------
 
 .. math::
+    \text{distance} =
+    \frac{\texttt{left\_ticks} + \texttt{right\_ticks}}{2.0}
+    \times \texttt{MM\_PER\_TICK}
 
-   	ext{\texttt{heading\_rad}} = \frac{\text{\texttt{tick\_diff}}}{\text{\texttt{TICKS\_PER\_REV}}} \times \frac{\text{\texttt{WHEEL\_CIRC\_MM}}}{\text{\texttt{TRACK\_WIDTH\_MM}}}
+Average of both encoders smooths odometry error and provides forward
+displacement in millimeters.
+
+
+Heading Angle
+-------------
 
 .. math::
+    \texttt{tick\_diff} =
+    \texttt{left\_ticks} - \texttt{right\_ticks}
 
-   	ext{\texttt{heading\_deg}} = \text{\texttt{heading\_rad}} \times \frac{180}{\pi}
+.. math::
+    \texttt{heading\_rad} =
+    \frac{\texttt{tick\_diff}}{\texttt{TICKS\_PER\_REV}}
+    \times
+    \frac{\texttt{WHEEL\_CIRC\_MM}}{\texttt{TRACK\_WIDTH\_MM}}
+
+.. math::
+    \texttt{heading\_deg} =
+    \texttt{heading\_rad} \times \frac{180}{\pi}
 
 Positive heading indicates counter-clockwise rotation (left turn).
 
