@@ -1,9 +1,30 @@
-'''ME 405 Lab0x05 Integrating Lab 0x04 Working Code with Newest Code from Lab 0x05
+"""
+Defunct main program for IMU-based obstacle course navigation robot.
+This is a previous version that uses BNO055 IMU for heading estimation instead
+of encoder-based odometry. Implements cooperative multitasking with IMU calibration,
+observer-based state estimation, and navigation control.
 
-# Listing USB serial devices in Terminal:                 ls /dev/tty.*
-# Connecting to the board in Terminal:             screen /dev/tty.usbmodem205F379C39472 115200
-# To exit screen:                                   Ctrl-A, K, Y
-# To soft reset the board:                            Ctrl-D'''
+Hardware:
+    - Motors: 2x DC motors with encoders (1437.1 ticks/rev)
+    - IR Sensor Array: 7 reflectance sensors for line detection
+    - IMU: BNO055 9-DOF sensor (I2C on B13/B14, reset on B15)
+    - Wheel Diameter: 70mm (35mm radius)
+    - Track Width: 141mm
+
+Notes:
+    - Uses cotask cooperative scheduler with priority-based task execution
+    - IMU calibration runs at startup, saves/loads calibration data
+    - Observer task fuses IMU heading with encoder data for state estimation
+    - Velocity control runs at 12ms period, closed-loop control at 20ms
+    - Monitor task reads IMU data at 70ms, observer updates at 100ms
+    - Navigation task coordinates line following, turns, and positioning
+
+Terminal Commands:
+    - Listing USB serial devices:       ls /dev/tty.*
+    - Connecting to board:               screen /dev/tty.usbmodem205F379C39472 115200
+    - Exit screen:                       Ctrl-A, K, Y
+    - Soft reset board:                  Ctrl-D
+"""
 
 import gc
 import pyb
