@@ -103,6 +103,133 @@ The navigation task represents the top level supervisory finite state machine th
 
 The navigation FSM evaluates distance, heading, and event flags at a fixed period and transitions when thresholds are reached or when heading error falls within a specified tolerance. During line following segments it enables line tracking and may apply bias to prefer a branch at a fork. During non line regions it enables force straight mode and uses heading feedback to maintain a commanded orientation. For precise reorientation, navigation asserts a turning mode and updates the desired heading share until the control layer reports convergence. When a bump event is detected, navigation switches into a recovery sequence that backs away, reorients, and returns to the line so the run can continue or conclude cleanly.
 
+State-by-State Breakdown
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The complete navigation FSM consists of 24 states (0-23) organized into main course navigation (0-15) and bump-triggered recovery (16-23). Each state is triggered by encoder-based odometry thresholds or heading convergence conditions.
+
+**State 0: Initial Line Following**
+  - **Mode**: Line following
+  - **Action**: Follow line from start
+  - **Transition**: When ``distance > 650``, move to State 1
+
+**State 1: Prepare for First Left Turn**
+  - **Mode**: Line following
+  - **Action**: Continue on line, approaching first turn
+  - **Transition**: When ``distance > 1100``, move to State 2
+
+**State 2: Execute First Left Turn**
+  - **Mode**: Turning
+  - **Action**: Turn to heading ``-90°``
+  - **Transition**: When ``heading ≈ -90° (±4°)``, move to State 3
+
+**State 3: Force Straight After First Turn**
+  - **Mode**: Force straight
+  - **Action**: Drive straight at ``-90°`` heading
+  - **Transition**: When ``distance > 1800``, move to State 4
+
+**State 4: Resume Line Following**
+  - **Mode**: Line following
+  - **Action**: Follow line through middle section
+  - **Transition**: When ``distance > 2050``, move to State 5
+
+**State 5: Execute Second Left Turn**
+  - **Mode**: Turning
+  - **Action**: Turn to heading ``180°``
+  - **Transition**: When ``heading ≈ 180° (±4°)``, move to State 6
+
+**State 6: Force Straight After Second Turn**
+  - **Mode**: Force straight
+  - **Action**: Drive straight at ``180°`` heading
+  - **Transition**: When ``distance > 2500``, move to State 7
+
+**State 7: Line Follow with Right Bias (Fork)**
+  - **Mode**: Line following (bias = 3)
+  - **Action**: Follow line, preferring right fork
+  - **Transition**: When ``distance > 3050``, move to State 8
+
+**State 8: Continue Line Following**
+  - **Mode**: Line following
+  - **Action**: Follow line post-fork
+  - **Transition**: When ``distance > 3500``, move to State 9
+
+**State 9: Execute Third Left Turn**
+  - **Mode**: Turning
+  - **Action**: Turn to heading ``90°``
+  - **Transition**: When ``heading ≈ 90° (±4°)``, move to State 10
+
+**State 10: Force Straight After Third Turn**
+  - **Mode**: Force straight
+  - **Action**: Drive straight at ``90°`` heading
+  - **Transition**: When ``distance > 4200``, move to State 11
+
+**State 11: Line Follow to Fourth Turn**
+  - **Mode**: Line following
+  - **Action**: Follow line approaching final turn
+  - **Transition**: When ``distance > 4650``, move to State 12
+
+**State 12: Execute Fourth Left Turn**
+  - **Mode**: Turning
+  - **Action**: Turn to heading ``0°``
+  - **Transition**: When ``heading ≈ 0° (±4°)``, move to State 13
+
+**State 13: Force Straight Toward Wall**
+  - **Mode**: Force straight
+  - **Action**: Drive straight at ``0°`` heading toward wall
+  - **Transition**: When ``distance > 5350``, move to State 14
+
+**State 14: Final Turn Away from Wall**
+  - **Mode**: Turning
+  - **Action**: Turn to heading ``180°``
+  - **Transition**: When ``heading ≈ 180° (±4°)``, move to State 15
+
+**State 15: Approach Wall (Bump Armed)**
+  - **Mode**: Force straight
+  - **Action**: Drive straight at ``180°`` toward wall
+  - **Transition**: When ``bump_flag == True``, move to State 16 (recovery sequence)
+
+**Recovery Sequence (States 16-23)**
+
+**State 16: Backup After Bump**
+  - **Mode**: Backup
+  - **Action**: Reverse away from wall
+  - **Transition**: When ``distance > 5600``, move to State 17
+
+**State 17: Reorient Turn 1**
+  - **Mode**: Turning
+  - **Action**: Turn to heading ``90°``
+  - **Transition**: When ``heading ≈ 90° (±4°)``, move to State 18
+
+**State 18: Drive Straight Segment 1**
+  - **Mode**: Force straight
+  - **Action**: Drive straight at ``90°`` heading
+  - **Transition**: When ``distance > 5900``, move to State 19
+
+**State 19: Reorient Turn 2**
+  - **Mode**: Turning
+  - **Action**: Turn to heading ``0°``
+  - **Transition**: When ``heading ≈ 0° (±4°)``, move to State 20
+
+**State 20: Drive Straight Segment 2**
+  - **Mode**: Force straight
+  - **Action**: Drive straight at ``0°`` heading
+  - **Transition**: When ``distance > 6450``, move to State 21
+
+**State 21: Reorient Turn 3**
+  - **Mode**: Turning
+  - **Action**: Turn to heading ``90°``
+  - **Transition**: When ``heading ≈ 90° (±4°)``, move to State 22
+
+**State 22: Return to Line**
+  - **Mode**: Line following
+  - **Action**: Follow line back to course
+  - **Transition**: When ``distance > 6950``, move to State 23
+
+**State 23: Terminal State**
+  - **Mode**: Stopped
+  - **Action**: Motors disabled, navigation complete
+  - **Transition**: None (end of run)
+
 Bump Sensor Task
 ----------------
 
