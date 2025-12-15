@@ -16,8 +16,12 @@ This module provides:
 
 import pyb
 from pyb import Pin
-from IMU_driver import BNO055
-from CalibrationManager import CalibrationManager
+try:
+    from .IMU_driver import BNO055
+    from .CalibrationManager import CalibrationManager
+except ImportError:
+    from IMU_driver import BNO055
+    from CalibrationManager import CalibrationManager
 
 
 def calibration_task_fun(shares):

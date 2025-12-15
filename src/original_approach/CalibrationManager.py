@@ -20,7 +20,10 @@ Notes:
 """
 
 import os
-from IMU_driver import BNO055
+try:
+    from .IMU_driver import BNO055
+except ImportError:
+    from IMU_driver import BNO055
 
 
 class CalibrationManager:

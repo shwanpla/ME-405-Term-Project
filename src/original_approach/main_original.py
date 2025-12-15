@@ -40,9 +40,14 @@ import motor_ctrl_task_V3 as motor_ctrl_task
 import CL_control_task_V5 as CL_control_task
 from serial_task_V6 import serial_task_fun
 
-from IMU_driver import BNO055
-from CalibrationManager import CalibrationManager
-from IMU_handler import calibration_task_fun, imu_monitor_task_fun
+try:
+    from .IMU_driver import BNO055
+    from .CalibrationManager import CalibrationManager
+    from .IMU_handler import calibration_task_fun, imu_monitor_task_fun
+except ImportError:
+    from IMU_driver import BNO055
+    from CalibrationManager import CalibrationManager
+    from IMU_handler import calibration_task_fun, imu_monitor_task_fun
 
 from observer_fcn import observer_task_fcn
 from navigation import navigation_task_fun

@@ -33,6 +33,8 @@ autodoc_mock_imports = [
     'uos',
     'ujson',
     'time',
+    'ulab',
+    'ulab.numpy',
 ]
 
 # The master file (index)
