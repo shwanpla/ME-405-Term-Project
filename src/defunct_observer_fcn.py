@@ -1,298 +1,225 @@
-"""
-Observer task for kinematic state estimation using RK4 integration.
-
-Maintains and updates a 6-state vector:
-    x = [X, Y, Theta, s, Omega_L, Omega_R]^T
-
-Where:
-    X, Y      : Global position in meters
-    Theta     : Heading in radians
-    s         : Arc length traveled (meters)
-    Omega_L/R : Wheel linear velocities (m/s)
-
-The observer:
-    - Uses measured wheel speeds (from encoders) converted to m/s
-    - Uses IMU heading (with offset and low-pass filtering) for position update
-    - Integrates the kinematics with an RK4 solver at 100 ms horizon, 10 ms step
-    - Publishes X, Y, and heading to shared variables for navigation
-"""
-
+import ulab
 from ulab import numpy as np
 from math import pi, cos, sin
-try:
-    from .defunct_RK4_solver import RK4_solver
-except ImportError:
-    from original_approach.defunct_RK4_solver import RK4_solver
-
+import battery_adc
+from RK4_solver import RK4_solver
 
 def normalize_angle_deg(angle_deg):
-    """
-    Normalize an angle in degrees to the [-180, 180] range.
-
-    :param angle_deg: Angle to normalize, in degrees
-    :type angle_deg: float
-    :return: Normalized angle in [-180, 180] degrees
-    :rtype: float
-    """
+    '''!@brief Normalize angle to [-180, 180] range
+    @param angle_deg Angle in degrees
+    @return Normalized angle in degrees
+    '''
     while angle_deg > 180.0:
         angle_deg -= 360.0
     while angle_deg < -180.0:
         angle_deg += 360.0
     return angle_deg
 
-
 def observer_task_fcn(shares):
-    """
-    Observer task function (generator) for cooperative multitasking.
-
-    Integrates the robot's full kinematic state using an RK4 solver, combining:
-        - Encoder-derived wheel velocities (ticks/us -> m/s)
-        - IMU heading (with offset and low-pass filtering) for position update
-
-    The state vector is:
-        x = [X, Y, Theta, s, Omega_L, Omega_R]^T
-
-    where:
-        X, Y      : Global position (meters)
-        Theta     : Heading (radians)
-        s         : Arc length traveled (meters)
-        Omega_L/R : Wheel linear velocities (m/s)
-
-    Shares (in order of tuple):
-        meas_heading_share       : Measured IMU heading (deg)
-        meas_yaw_rate_share      : Measured IMU yaw rate (deg/s)
-        left_enc_pos             : Left encoder position (unused here)
-        right_enc_pos            : Right encoder position (unused here)
-        left_enc_speed           : Left encoder speed (ticks/us)
-        right_enc_speed          : Right encoder speed (ticks/us)
-        obs_heading_share        : Output observer heading (deg)
-        obs_yaw_rate_share       : Output observer yaw rate (deg/s)
-        left_set_point           : Left motor effort setpoint (unused here)
-        right_set_point          : Right motor effort setpoint (unused here)
-        observer_calibration_flg : Flag to trigger observer initialization (1=start)
-        big_X_share              : Output X position (mm)
-        big_Y_share              : Output Y position (mm)
-        initial_heading_share    : Initial heading reference (deg)
-        end_flg                  : End-of-trial flag (1 = end)
-
-    :param shares: Tuple of task_share.Share objects used by the observer
-    :type shares: tuple
-    :yield: None; used as a cooperative task generator
-    :rtype: None
-    """
-    (meas_heading_share, meas_yaw_rate_share,
-     left_enc_pos, right_enc_pos,
-     left_enc_speed, right_enc_speed,
-     obs_heading_share, obs_yaw_rate_share,
-     left_set_point, right_set_point,
-     observer_calibration_flg,
-     big_X_share, big_Y_share, initial_heading_share, end_flg) = shares
-
-    # ----------------------------------------------------------------------
-    # Kinematics model
-    # ----------------------------------------------------------------------
+    '''!@brief Observer task - integrates full kinematic state using RK4
+    Maintains state: [X, Y, Theta, s, Omega_L, Omega_R]
+    Uses IMU heading for heading correction during integration
+    Runs once per motor control update period to stay synchronized
+    '''
+    
+    (meas_heading_share, meas_yaw_rate_share, 
+    left_enc_pos, right_enc_pos,
+    left_enc_speed, right_enc_speed,
+    obs_heading_share, obs_yaw_rate_share, 
+    left_set_point, right_set_point,
+    observer_calibration_flg,
+    big_X_share, big_Y_share, initial_heading_share, end_flg) = shares
+    
+    # Define kinematics function locally
     def kinematics_fun(t, x, omega_L_ms, omega_R_ms, imu_heading_rad):
-        """
-        Full kinematic model for differential-drive robot.
-
-        State:
-            x = [X, Y, Theta, s, Omega_L, Omega_R]^T
-
-        Inputs:
-            omega_L_ms, omega_R_ms : Measured wheel linear velocities (m/s)
-            imu_heading_rad        : Corrected IMU heading (radians)
-
-        :param t: Time (unused, included for RK4 compatibility)
-        :type t: float
-        :param x: Current state vector as 6x1 column (ulab/numpy array)
-        :type x: ulab.numpy.ndarray
-        :param omega_L_ms: Left wheel velocity in m/s
-        :type omega_L_ms: float
-        :param omega_R_ms: Right wheel velocity in m/s
-        :type omega_R_ms: float
-        :param imu_heading_rad: Corrected IMU heading in radians
-        :type imu_heading_rad: float
-        :return: (xd, y) where xd is state derivative, y is output vector
-        :rtype: tuple(ulab.numpy.ndarray, ulab.numpy.ndarray)
-        """
-        w = 0.141  # Track width [m]
-
-        X = x[0, 0]
-        Y = x[1, 0]
-        Theta = x[2, 0]
-        s = x[3, 0]
-
-        # Measured linear wheel velocities (already in m/s)
-        v_L = omega_L_ms
-        v_R = omega_R_ms
-
-        v_center = (v_L + v_R) / 2.0       # Forward velocity at center
-        omega_body = (v_R - v_L) / w       # Yaw rate (rad/s)
-
-        # Position update uses corrected IMU heading
+        '''!@brief Full kinematic model for Romi robot
+        State: x = [X, Y, Theta, s, Omega_L, Omega_R] (6 states)
+        Uses MEASURED wheel velocities in m/s and IMU heading
+        '''
+        
+        # Robot parameters
+        r = 0.035                     # Wheel radius [m]
+        w = 0.141                     # Track width [m]
+        
+        # Extract state variables
+        X = x[0, 0]          # Global X position [m]
+        Y = x[1, 0]          # Global Y position [m]
+        Theta = x[2, 0]      # Heading [rad]
+        s = x[3, 0]          # Arc length traveled [m]
+        
+        # Use the PASSED-IN measured velocities (already in m/s)
+        v_L = omega_L_ms  # linear velocity m/s
+        v_R = omega_R_ms  # linear velocity m/s
+        
+        # Average velocity and angular velocity
+        v_center = (v_L + v_R) / 2.0  # Forward velocity at center
+        omega_body = (v_R - v_L) / w   # Angular velocity (yaw rate)
+        
+        # Use IMU heading directly for position calculation
+        # This ensures X, Y are calculated with correct heading reference
+        # NOTE: If the robot veers off track, try adjusting the heading by 180° or 90°
+        # heading_corrected = imu_heading_rad + pi  # Uncomment to flip 180°
         heading_corrected = imu_heading_rad
         X_dot = v_center * cos(heading_corrected)
         Y_dot = -v_center * sin(heading_corrected)
-
+        
+        # Heading derivative from wheel velocities
         Theta_dot = omega_body
+        
+        # Arc length derivative
         s_dot = v_center
-
+        
+        # State derivative vector
         xd = np.array([
             [X_dot],
             [Y_dot],
             [Theta_dot],
             [s_dot],
-            [v_L],
-            [v_R],
+            [v_L],      
+            [v_R]       
         ])
-
+        
+        # Output vector
         y = np.array([
             [X],
             [Y],
             [Theta],
             [s],
-            [v_center],   # Linear velocity
-            [omega_body], # Angular velocity
+            [v_center],      # Linear velocity
+            [omega_body]     # Angular velocity
         ])
-
+        
         return xd, y
-
-    # ----------------------------------------------------------------------
-    # Robot parameters & scaling
-    # ----------------------------------------------------------------------
-    r = 0.035              # Wheel radius [m]
-    w = 0.141              # Track width [m]
+    
+    # Robot parameters
+    r = 0.035                     # Wheel radius [m]
+    w = 0.141                     # Track width [m]
     TICKS_PER_REV = 1437.1
-    WHEEL_CIRC_M = 2 * pi * r
-
-    # Velocity scale factor:
-    #   - If observer distance < physical distance, increase VELOCITY_SCALE.
-    #   - If observer distance > physical distance, decrease VELOCITY_SCALE.
-    VELOCITY_SCALE = 2.0
-
+    WHEEL_CIRC_M = 2 * pi * r  # meters
+    
+    # Velocity calibration factor - adjust if scale is wrong
+    # If observer shows half the distance traveled, set this to 2.0
+    # If observer shows double the distance, set this to 0.5
+    VELOCITY_SCALE = 2.0  # <-- TUNE THIS if scale is off
+    
     FIRST_RUN = True
     run = False
     printed = False
     x = None
-
-    imu_heading_offset_rad = 0.0
-    prev_imu_heading_deg = 0.0
-    imu_alpha = 0.3  # Low-pass filter coefficient for IMU heading
-
-    # ----------------------------------------------------------------------
-    # Main observer loop
-    # ----------------------------------------------------------------------
+    imu_heading_offset_rad = 0.0  # Offset to correct IMU heading
+    prev_imu_heading_deg = 0.0  # For smoothing
+    imu_alpha = 0.3  # Low-pass filter coefficient (0.0 = all previous, 1.0 = all current)
+    
     while True:
-        # Initialize observer when calibration flag is set
         if observer_calibration_flg.get() == 1:
+            # Get initial heading from IMU (in degrees)
             initial_heading_deg = meas_heading_share.get()
-
-            # Robot is assumed pointing +X (0°). Offset aligns IMU reading.
+            
+            # The robot is pointing in +X direction (0°), so calculate the offset
+            # If IMU reads -79.63°, offset = -(-79.63°) = +79.63°
             imu_heading_offset_deg = -initial_heading_deg
             imu_heading_offset_rad = imu_heading_offset_deg * pi / 180.0
-
+            
             print(f"IMU heading at startup: {initial_heading_deg:.2f}°")
-            print(
-                "IMU heading offset (to +X = 0°): "
-                f"{imu_heading_offset_deg:.2f}° ({imu_heading_offset_rad:.4f} rad)"
-            )
-
-            # Use 0° as reference heading in global frame
-            initial_heading_share.put(0.0)
-
-            # Initial position in mm, stored to shares (also used below in state)
-            initial_X_mm = 100.0
-            initial_Y_mm = 800.0
+            print(f"IMU heading offset (to correct to +X = 0°): {imu_heading_offset_deg:.2f}° ({imu_heading_offset_rad:.4f} rad)")
+            
+            initial_heading_share.put(0.0)  # Store 0° as the reference (robot pointing +X)
+            
+            initial_X_mm = 100  # mm
+            initial_Y_mm = 800  # mm
             big_X_share.put(initial_X_mm)
             big_Y_share.put(initial_Y_mm)
-
+            
             observer_calibration_flg.put(0)
             run = True
-
+        
         if run:
             if FIRST_RUN:
-                # Initial state: position in meters, heading = 0 rad
+                # Initialize state: [X, Y, Theta, s, Omega_L, Omega_R]
+                # Position in mm converted to m, heading = 0° (pointing +X)
                 x = np.array([
-                    [100.0 / 1000.0],  # X = 100 mm
-                    [800.0 / 1000.0],  # Y = 800 mm
-                    [0.0],             # Theta
-                    [0.0],             # s
-                    [0.0],             # Omega_L
-                    [0.0],             # Omega_R
+                    [100.0 / 1000.0],          # X = 100 mm = 0.1 m
+                    [800.0 / 1000.0],          # Y = 800 mm = 0.8 m
+                    [0.0],                     # Theta = 0° (pointing +X direction)
+                    [0.0],                     # s = 0 (no distance traveled yet)
+                    [0.0],                     # Omega_L = 0
+                    [0.0]                      # Omega_R = 0
                 ])
                 FIRST_RUN = False
-                print("[FIRST_RUN] Observer initialized at (100, 800) mm, heading 0° (+X)\n")
-
-            # Encoder speeds in ticks/us
+                print(f"[FIRST_RUN] Observer initialized at (100, 800) mm pointing +X (0°)\n")
+            
+            # Get CURRENT measured wheel velocities (in ticks/us from encoder)
             omega_L_ticks_us = left_enc_speed.get()
             omega_R_ticks_us = right_enc_speed.get()
-
+            
             # Convert from ticks/us to m/s
             # ticks/us * (meters/tick) * (1e6 us/s) = m/s
-            meters_per_tick = WHEEL_CIRC_M / TICKS_PER_REV
-            omega_L_ms = omega_L_ticks_us * meters_per_tick * 1e6 * VELOCITY_SCALE
-            omega_R_ms = omega_R_ticks_us * meters_per_tick * 1e6 * VELOCITY_SCALE
-
-            # IMU heading in degrees (low-pass filtered)
+            omega_L_ms = omega_L_ticks_us * (WHEEL_CIRC_M / TICKS_PER_REV) * 1e6 * VELOCITY_SCALE
+            omega_R_ms = omega_R_ticks_us * (WHEEL_CIRC_M / TICKS_PER_REV) * 1e6 * VELOCITY_SCALE
+            
+            # Get current IMU heading (in degrees) and convert to radians
             imu_heading_deg = meas_heading_share.get()
-            imu_heading_deg = (
-                imu_alpha * imu_heading_deg
-                + (1.0 - imu_alpha) * prev_imu_heading_deg
-            )
+            
+            # Low-pass filter the IMU heading to reduce jitter
+            # This helps smooth out rapid heading oscillations
+            imu_heading_deg = imu_alpha * imu_heading_deg + (1.0 - imu_alpha) * prev_imu_heading_deg
             prev_imu_heading_deg = imu_heading_deg
-
+            
             imu_heading_rad = imu_heading_deg * pi / 180.0
-
-            # Apply static offset to align IMU frame with robot frame
+            
+            # Apply offset correction to align IMU heading with robot frame
+            # Robot pointing +X = 0°
             heading_corrected_rad = imu_heading_rad + imu_heading_offset_rad
             heading_corrected_deg = heading_corrected_rad * 180.0 / pi
             heading_corrected_deg = normalize_angle_deg(heading_corrected_deg)
-
-            # Wrapper for RK4 solver (expects f(t, x) -> (xd, y))
+            
+            # Wrapper function for RK4 solver (RK4_solver expects fcn(t, x) format)
             def kinematics_wrapper(t, x_col):
-                xd, y = kinematics_fun(
-                    t, x_col, omega_L_ms, omega_R_ms, heading_corrected_rad
-                )
+                '''Wrapper to convert column vector to/from kinematics_fun format'''
+                # Use corrected heading for position integration
+                xd, y = kinematics_fun(t, x_col, omega_L_ms, omega_R_ms, heading_corrected_rad)
                 return xd, y
-
-            # RK4 integration from 0 to 0.1 s with 0.01 s step
+            
+            # Run RK4 integration for 100ms with 10ms steps
             tout, yout = RK4_solver(kinematics_wrapper, x, [0, 0.1], 0.01)
-
-            # Use final state from integration
+            
+            # Extract final state from the last row
             x = np.array([[yout[-1, i]] for i in range(6)])
-
-            X_final = x[0, 0]  # m
-            Y_final = x[1, 0]  # m
-            s_final = x[3, 0]  # m
-
-            # For output, use corrected IMU heading
+            
+            # Extract final state
+            X_final = x[0, 0]  # in meters
+            Y_final = x[1, 0]  # in meters
+            Theta_final = x[2, 0]  # in radians (from encoder integration)
+            s_final = x[3, 0]  # arc length in meters
+            
+            # Set heading to corrected IMU value for output
             Theta_final_deg = heading_corrected_deg
-
+            
+            # Convert position to mm
             X_final_mm = X_final * 1000.0
             Y_final_mm = Y_final * 1000.0
-
+            
+            # Store outputs
             big_X_share.put(X_final_mm)
             big_Y_share.put(Y_final_mm)
             obs_heading_share.put(Theta_final_deg)
             obs_yaw_rate_share.put(meas_yaw_rate_share.get())
-
-            # Update state heading with corrected IMU heading (radians)
+            
+            # Update state heading with corrected IMU value for next iteration
             x[2, 0] = heading_corrected_rad
-
-            # Optional debug summary when trial ends
+            
+            # Debug: Print scale factor diagnosis (uncomment to debug velocity scaling)
+            # If observer distance / physical distance ≠ 1.0, there's a scaling issue
+            # observer_distance_mm = s_final * 1000.0
+            # physical_distance_mm = 650  # From 100 to 750 in X
+            # scale_factor = observer_distance_mm / physical_distance_mm
+            # print(f"Velocity scale factor: {scale_factor:.3f} (should be 1.0)")
+            
+            # Debug output with velocity info
+            v_avg_cms = ((omega_L_ms + omega_R_ms) / (2.0 * VELOCITY_SCALE)) * 100  # Convert m/s to cm/s
+            omega_yaw_degs = ((omega_R_ms - omega_L_ms) / w) * 180.0 / pi  # Angular velocity in deg/s
             if end_flg.get() == 1 and not printed:
-                v_avg_ms = (omega_L_ms + omega_R_ms) / (2.0 * VELOCITY_SCALE)
-                v_avg_cms = v_avg_ms * 100.0
-                print(
-                    "X = {:.1f} mm, Y = {:.1f} mm, Heading = {:.2f}° "
-                    "(corrected), s = {:.1f} mm | v = {:.1f} cm/s".format(
-                        X_final_mm,
-                        Y_final_mm,
-                        Theta_final_deg,
-                        s_final * 1000.0,
-                        v_avg_cms,
-                    )
-                )
+                print(f"X = {X_final_mm:.1f} mm, Y = {Y_final_mm:.1f} mm, Heading = {Theta_final_deg:.2f}° (corrected), s = {s_final*1000:.1f} mm | v={v_avg_cms:.1f}cm/s")
                 printed = True
-
+        
         yield

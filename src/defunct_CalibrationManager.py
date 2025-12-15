@@ -1,92 +1,71 @@
 """
-Calibration Manager for BNO055 IMU.
+Calibration manager for BNO055 IMU sensor with persistent storage.
+Handles saving and loading calibration coefficients to/from calibration.txt file.
 
-Handles persistent storage of IMU calibration data by converting
-binary calibration blobs to/from hex strings stored in a text file.
-
-Typical usage:
-    imu = BNO055(...)
-    cm = CalibrationManager(imu)
-
-    # Save current calibration to file
-    cm.save_calibration()
-
-    # Load previously saved calibration
-    cm.load_calibration()
+Hardware:
+    - IMU Sensor: BNO055 9-DOF absolute orientation sensor
+    - I2C Communication: I2C interface for sensor communication
 
 Notes:
-    - Calibration data is stored as a 22-byte blob (BNO055 requirement)
-    - File is saved in the local filesystem as "calibration.txt"
+    - Calibration blob is 22 bytes containing all calibration coefficients
+    - Stored as hexadecimal string in calibration.txt
+    - Calibration must be performed when no valid calibration file exists
 """
 
 import os
-try:
-    from .defunct_IMU_driver import BNO055
-except ImportError:
-    from original_approach.defunct_IMU_driver import BNO055
+from IMU_driver import BNO055
 
 
 class CalibrationManager:
     """
-    Manages persistent calibration storage for the BNO055 IMU.
-
-    Provides:
-        - Conversion between binary calibration blobs and hex strings
-        - Reading/writing calibration data to a file
-        - Validation of calibration data length
-        - Convenience helpers for existence and deletion
+    Manages BNO055 IMU calibration persistence with file-based storage.
+    Provides methods to save, load, and verify calibration data.
     """
 
     CALIB_FILE = "calibration.txt"
-    CALIB_BLOB_LEN = 22  # Expected length of BNO055 calibration blob
+    CALIB_BLOB_LEN = 22
 
     def __init__(self, imu):
         """
-        Initialize the calibration manager.
+        Initialize calibration manager with BNO055 IMU instance.
 
-        :param imu: Instance of a BNO055 IMU driver
+        :param imu: BNO055 IMU driver instance
         :type imu: BNO055
         """
         self.imu = imu
-
-    # ----------------------------------------------------------------------
-    # Conversion Helpers
-    # ----------------------------------------------------------------------
-
+    
     def calib_blob_to_hex(self, blob):
         """
-        Convert a raw calibration blob (bytes) into a continuous hex string.
+        Convert calibration blob (bytes) to hexadecimal string representation.
 
-        :param blob: Calibration blob returned by IMU
+        :param blob: Raw calibration data bytes from IMU
         :type blob: bytes
-        :return: Uppercase hex string representing the calibration data
+        :return: Hexadecimal string representation of calibration data
         :rtype: str
         """
         return ''.join('{:02X}'.format(b) for b in blob)
 
     def hex_to_calib_blob(self, hex_str):
         """
-        Convert a stored hex string back into a calibration blob (bytes).
+        Convert hexadecimal string back to calibration blob (bytes).
 
-        Strips whitespace before decoding.
-
-        :param hex_str: Hexadecimal string representation of calibration data
+        :param hex_str: Hexadecimal string from calibration file
         :type hex_str: str
-        :return: Decoded calibration blob
+        :return: Calibration data as bytes
         :rtype: bytes
         """
+        # Remove whitespace and convert pairs of hex chars to bytes
         hex_str = hex_str.replace(' ', '').replace('\n', '')
         return bytes(int(hex_str[i:i+2], 16) for i in range(0, len(hex_str), 2))
-
-    # ----------------------------------------------------------------------
-    # Persistence (Save / Load)
-    # ----------------------------------------------------------------------
-
+    
     def save_calibration(self):
         """
-        Read calibration from the IMU and save it to the calibration file.
+        Read calibration coefficients from IMU and save to persistent storage.
 
-        :return: True on success, False on failure
+        Reads the 22-byte calibration blob from the BNO055 sensor and writes
+        it to calibration.txt as a hexadecimal string.
+
+        :return: True if calibration saved successfully, False otherwise
         :rtype: bool
         """
         try:
@@ -99,64 +78,61 @@ class CalibrationManager:
             print(f"✓ Calibration saved to {self.CALIB_FILE}")
             print(f"  Data: {hex_data}")
             return True
-
         except Exception as e:
             print(f"✗ Failed to save calibration: {e}")
             return False
-
+    
     def load_calibration(self):
         """
-        Load calibration data from the file and write it into the IMU.
+        Load calibration coefficients from file and write to IMU sensor.
 
-        Validates that the stored calibration contains the required number
-        of bytes before writing.
+        Reads calibration data from calibration.txt, validates the format and
+        length, then writes the 22-byte calibration blob to the BNO055 sensor.
 
-        :return: True if calibration successfully loaded, False otherwise
+        :return: True if calibration loaded successfully, False otherwise
         :rtype: bool
         """
         try:
+            # Check if file exists
             if self.CALIB_FILE not in os.listdir():
                 print(f"⚠ {self.CALIB_FILE} not found - calibration required")
                 return False
 
+            # Read file
             with open(self.CALIB_FILE, 'r') as f:
                 hex_data = f.read()
 
+            # Convert and validate
             blob = self.hex_to_calib_blob(hex_data)
-
             if len(blob) != self.CALIB_BLOB_LEN:
-                print(
-                    f"✗ Invalid calibration file "
-                    f"(expected {self.CALIB_BLOB_LEN} bytes, got {len(blob)})"
-                )
+                print(f"✗ Invalid calibration file (expected {self.CALIB_BLOB_LEN} bytes, got {len(blob)})")
                 return False
 
+            # Write to IMU
             self.imu.write_calibration_blob(blob)
             print(f"✓ Calibration loaded from {self.CALIB_FILE}")
             return True
-
         except Exception as e:
             print(f"✗ Failed to load calibration: {e}")
             return False
-
-    # ----------------------------------------------------------------------
-    # Utility Helpers
-    # ----------------------------------------------------------------------
-
+    
     def calibration_exists(self):
         """
-        Check whether a valid calibration file is present.
+        Check if calibration file exists in the current directory.
 
-        :return: True if file exists, False otherwise
+        :return: True if calibration.txt exists, False otherwise
         :rtype: bool
         """
         return self.CALIB_FILE in os.listdir()
 
     def delete_calibration(self):
         """
-        Delete the stored calibration file.
+        Delete stored calibration file (for testing purposes).
 
-        :return: True if deleted, False if file not found or delete failed
+        Removes calibration.txt file from the filesystem if it exists.
+        Used to force recalibration during testing and development.
+
+        :return: True if file deleted successfully, False if file not found
         :rtype: bool
         """
         try:
@@ -165,7 +141,6 @@ class CalibrationManager:
                 print(f"✓ Deleted {self.CALIB_FILE}")
                 return True
             return False
-
         except Exception as e:
             print(f"✗ Failed to delete calibration: {e}")
             return False
