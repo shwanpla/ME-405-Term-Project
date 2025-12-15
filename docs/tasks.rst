@@ -94,13 +94,6 @@ Navigation Task
 
 The navigation task represents the top level supervisory finite state machine that executes the obstacle course strategy. It does not perform low level control directly. Instead, it commands system behavior by setting shared mode flags, desired velocities, target headings, and line bias values that the closed loop control layer interprets. This design keeps navigation focused on sequencing and decision making while the lower level tasks remain responsible for timing critical sensing and actuation.
 
-.. image:: /images/navigation_fsm.png
-   :width: 95%
-   :align: center
-
-.. centered::
-   *Navigation finite state machine coordinating line following, force straight segments, heading based turns, and bump triggered recovery behavior.*
-
 The navigation FSM evaluates distance, heading, and event flags at a fixed period and transitions when thresholds are reached or when heading error falls within a specified tolerance. During line following segments it enables line tracking and may apply bias to prefer a branch at a fork. During non line regions it enables force straight mode and uses heading feedback to maintain a commanded orientation. For precise reorientation, navigation asserts a turning mode and updates the desired heading share until the control layer reports convergence. When a bump event is detected, navigation switches into a recovery sequence that backs away, reorients, and returns to the line so the run can continue or conclude cleanly.
 
 State-by-State Breakdown
