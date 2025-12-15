@@ -440,15 +440,6 @@ Hardware Constants
 Odometry Calculations
 """""""""""""""""""""
 
-Hardware Constants
-------------------
-WHEEL_RADIUS_MM = 35.0       # Wheel radius in millimeters
-TICKS_PER_REV  = 1437.1      # Encoder ticks per wheel revolution
-TRACK_WIDTH_MM = 141.0       # Distance between left and right wheels
-WHEEL_CIRC_MM  = 220.0       # Wheel circumference (2πr)
-MM_PER_TICK    = 0.153       # Millimeters per encoder tick
-
-
 Distance Traveled
 -----------------
 
