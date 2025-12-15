@@ -453,34 +453,30 @@ Distance Traveled
 -----------------
 
 .. math::
-   \[
-   \text{distance} = \frac{ \text{left\_ticks} + \text{right\_ticks} }{2} \cdot (\text{mm\_per\_tick})
-   \]
 
-Average of both encoders smooths odometry error and provides forward
-displacement in millimeters.
+    \text{distance} = 
+    \frac{\text{left_ticks} + \text{right_ticks}}{2}
+    \cdot \text{mm_per_tick}
+
+Average of both encoders smooths odometry error and provides forward displacement in millimeters.
 
 Heading Angle
 -------------
 
 .. math::
-   \[
-   \text{ticks\_diff} = \text{left\_ticks} - \text{right\_ticks}
-   \]
 
+    \text{ticks_diff} = \text{left_ticks} - \text{right_ticks}
 
 .. math::
-   \[
-   \theta_{\text{rad}} = 
-   \frac{\text{ticks\_diff}}{\text{TICKS\_PER\_REV}}
-   \cdot 
-   \left( \frac{\text{WHEEL\_CIRC\_MM}}{\text{TRACK\_WIDTH\_MM}} \right)
-   \]
+
+    \theta_{\text{rad}} =
+    \frac{\text{ticks_diff}}{\text{TICKS_PER_REV}}
+    \left( \frac{\text{WHEEL_CIRC_MM}}{\text{TRACK_WIDTH_MM}} \right)
 
 .. math::
-   \[
-   \theta_{\text{deg}} = \theta_{\text{rad}} \cdot \frac{180}{\pi}
-   \]
+
+    \theta_{\text{deg}} = \theta_{\text{rad}} \cdot \frac{180}{\pi}
+
 
 
 Positive heading indicates counter-clockwise rotation (left turn).
