@@ -464,18 +464,18 @@ Heading Angle
 -------------
 
 .. math::
-   	ext{tick\_diff} =
+   	text{tick\_diff} =
    left\_ticks - right\_ticks
 
 .. math::
-   	ext{heading\_rad} =
+   	text{theta\_rad} =
    \frac{\text{tick\_diff}}{\text{TICKS\_PER\_REV}}
    	imes
    \frac{\text{WHEEL\_CIRC\_MM}}{\text{TRACK\_WIDTH\_MM}}
 
 .. math::
-   	ext{heading\_deg} =
-   	ext{heading\_rad} \times \frac{180}{\pi}
+   	text{heading\_deg} =
+   	text{heading\_rad} \times \frac{180}{\pi}
 
 Positive heading indicates counter-clockwise rotation (left turn).
 
