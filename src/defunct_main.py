@@ -19,11 +19,11 @@ import CL_control_task_V5 as CL_control_task
 from serial_task_V6 import serial_task_fun
 from multi_sensor_read import multiple_ir_readings 
 
-from IMU_driver import BNO055
-from CalibrationManager import CalibrationManager
-from IMU_handler import calibration_task_fun, imu_monitor_task_fun
-from observer_fcn import observer_task_fcn
-from navigation import navigation_task_fun
+from defunct_IMU_driver import BNO055
+from defunct_CalibrationManager import CalibrationManager
+from defunct_IMU_handler import calibration_task_fun, imu_monitor_task_fun
+from defunct_observer_fcn import observer_task_fcn
+from defunct_navigation import navigation_task_fun
 
 # Creating Shares and Queues
 #----------------------------------------------------------------------------------------------------------------------

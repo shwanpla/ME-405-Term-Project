@@ -8,8 +8,8 @@ import pyb
 import cotask
 import task_share
 from pyb import Pin
-from IMU_driver import BNO055
-from CalibrationManager import CalibrationManager
+from defunct_IMU_driver import BNO055
+from defunct_CalibrationManager import CalibrationManager
 
 
 def calibration_task_fun(shares):

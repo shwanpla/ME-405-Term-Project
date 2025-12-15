@@ -13,7 +13,7 @@ Notes:
 """
 
 import os
-from IMU_driver import BNO055
+from defunct_IMU_driver import BNO055
 
 
 class CalibrationManager:
