@@ -438,18 +438,20 @@ Hardware Constants
    MM_PER_TICK = 0.153            # Millimeters per encoder tick
 
 Odometry Calculations
-"""""""""""""""""""""
+"""""""""""""""""""""""""""
 
 **Distance Traveled**
 
 .. math::
-   	ext{distance} = \frac{\text{\texttt{left\_ticks}} + \text{\texttt{right\_ticks}}}{2.0} \times \text{\texttt{MM\_PER\_TICK}}
+
+   \mathrm{distance} = \frac{\text{\texttt{left\_ticks}} + \text{\texttt{right\_ticks}}}{2.0} \times \text{\texttt{MM\_PER\_TICK}}
 
 Average of both encoders smooths odometry error and provides forward displacement in millimeters.
 
 **Heading Angle**
 
 .. math::
+
    	ext{\texttt{tick\_diff}} = \text{\texttt{left\_ticks}} - \text{\texttt{right\_ticks}}
 
 .. math::
