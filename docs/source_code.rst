@@ -449,6 +449,10 @@ WHEEL_CIRC_MM  = 220.0       # Wheel circumference (2πr)
 MM_PER_TICK    = 0.153       # Millimeters per encoder tick
 
 
+"""
+Odometry Calculations
+=====================
+
 Distance Traveled
 -----------------
 
@@ -459,7 +463,6 @@ Distance Traveled
 
 Average of both encoders smooths odometry error and provides forward
 displacement in millimeters.
-
 
 Heading Angle
 -------------
@@ -479,6 +482,7 @@ Heading Angle
     \texttt{heading\_rad} \times \frac{180}{\pi}
 
 Positive heading indicates counter-clockwise rotation (left turn).
+
 
 **Heading Unwrapping**
 
