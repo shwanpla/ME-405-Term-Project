@@ -7,6 +7,9 @@ import sys
 # Point Sphinx to your source code directory (MicroPython modules live here)
 sys.path.insert(0, os.path.abspath('../src'))
 
+# Add original_approach subpackage to path explicitly
+sys.path.insert(0, os.path.abspath('../src/original_approach'))
+
 # --- Project information -----------------------------------------------------
 project = 'ME 405 Term Project - Romi Navigation'
 author = 'Billy Hawkins, Tarsem Pal, and Arturo Ramirez'
@@ -37,6 +40,7 @@ autodoc_mock_imports = [
     'ulab.numpy',
     'cotask',
     'task_share',
+    'struct',
     'encoder',
     'motor',
     'multi_sensor_read',

@@ -8,3 +8,23 @@ RK4 numerical integration.
 Note: This implementation was replaced by the displacement-based odometry
 approach. See the Analysis documentation for details.
 """
+# Import main classes for easier discovery by autodoc
+try:
+    from .IMU_driver import BNO055, SoftI2C
+    from .CalibrationManager import CalibrationManager
+    from .observer_fcn import observer
+    from .RK4_solver import RK4
+except ImportError:
+    # Allow graceful failure if imports fail (e.g., during documentation build)
+    pass
+
+__all__ = [
+    'BNO055',
+    'SoftI2C',
+    'CalibrationManager',
+    'observer',
+    'RK4',
+    'calibration_task_fun',
+    'imu_monitor_task_fun',
+    'navigation_task_fun_original',
+]
