@@ -67,6 +67,6 @@ Main (Original)
 Task coordination and cooperative scheduler setup for the original approach.
 
 .. automodule:: defunct_main
-
-.. note::
-   This is a runnable script file with no exported functions or classes. All code is contained within the ``if __name__ == "__main__":`` block for direct execution.
+   :members:
+   :undoc-members:
+   :show-inheritance:
