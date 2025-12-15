@@ -35,6 +35,16 @@ autodoc_mock_imports = [
     'time',
     'ulab',
     'ulab.numpy',
+    'cotask',
+    'task_share',
+    'encoder',
+    'motor',
+    'multi_sensor_read',
+    'navigation',
+    'observer_fcn',
+    'serial_task_V6',
+    'CL_control_task_V5',
+    'motor_ctrl_task_V3',
 ]
 
 # The master file (index)
