@@ -172,10 +172,121 @@ IMU Hardware Notes
 Calibration Manager
 -------------------
 
+Manages BNO055 IMU calibration persistence with file-based storage. Handles saving and loading calibration coefficients to/from the filesystem for automatic calibration restoration on startup.
+
 .. automodule:: defunct_CalibrationManager
    :members:
    :undoc-members:
    :show-inheritance:
+
+CalibrationManager Class
+"""""""""""""""""""""""""
+
+.. py:class:: CalibrationManager(imu)
+
+   Manages BNO055 IMU calibration persistence with file-based storage.
+
+   :param imu: BNO055 IMU driver instance
+   :type imu: BNO055
+
+   **Class Attributes:**
+
+   - ``CALIB_FILE = "calibration.txt"``: Filename for calibration storage
+   - ``CALIB_BLOB_LEN = 22``: Expected calibration blob length in bytes
+
+.. py:method:: calib_blob_to_hex(blob)
+
+   Convert calibration blob (bytes) to hexadecimal string representation.
+
+   :param blob: Raw calibration data bytes from IMU
+   :type blob: bytes
+   :return: Hexadecimal string representation of calibration data
+   :rtype: str
+
+.. py:method:: hex_to_calib_blob(hex_str)
+
+   Convert hexadecimal string back to calibration blob (bytes).
+
+   :param hex_str: Hexadecimal string from calibration file
+   :type hex_str: str
+   :return: Calibration data as bytes
+   :rtype: bytes
+
+.. py:method:: save_calibration()
+
+   Read calibration coefficients from IMU and save to persistent storage.
+
+   Reads the 22-byte calibration blob from the BNO055 sensor and writes it to ``calibration.txt`` as a hexadecimal string.
+
+   :return: True if calibration saved successfully, False otherwise
+   :rtype: bool
+
+   **Example**::
+
+      >>> calib_mgr.save_calibration()
+      ✓ Calibration saved to calibration.txt
+        Data: A1B2C3D4E5F6...
+      True
+
+.. py:method:: load_calibration()
+
+   Load calibration coefficients from file and write to IMU sensor.
+
+   Reads calibration data from ``calibration.txt``, validates the format and length, then writes the 22-byte calibration blob to the BNO055 sensor.
+
+   :return: True if calibration loaded successfully, False otherwise
+   :rtype: bool
+
+   **Validation:**
+
+   - Checks if file exists in current directory
+   - Validates blob length equals 22 bytes
+   - Handles conversion from hex string to bytes
+
+.. py:method:: calibration_exists()
+
+   Check if calibration file exists in the current directory.
+
+   :return: True if ``calibration.txt`` exists, False otherwise
+   :rtype: bool
+
+.. py:method:: delete_calibration()
+
+   Delete stored calibration file (for testing purposes).
+
+   Removes ``calibration.txt`` file from the filesystem if it exists. Used to force recalibration during testing and development.
+
+   :return: True if file deleted successfully, False if file not found
+   :rtype: bool
+
+Calibration Workflow
+""""""""""""""""""""
+
+**Typical usage pattern:**
+
+1. **Initialization**: Create ``CalibrationManager`` with BNO055 instance
+2. **Check for existing calibration**: Use ``calibration_exists()``
+3. **Load or calibrate**:
+
+   - If calibration exists: Call ``load_calibration()`` to restore coefficients
+   - If no calibration: Perform manual calibration, then call ``save_calibration()``
+
+4. **Verification**: Check IMU calibration status reaches ``3/3`` for all subsystems
+
+**File Format:**
+
+The calibration file stores 22 bytes as a hexadecimal string:
+
+.. code-block:: text
+
+   A1B2C3D4E5F607080910111213141516171819202122
+
+**Calibration Notes:**
+
+- Calibration blob contains coefficients for accelerometer, gyroscope, and magnetometer
+- Must be performed in NDOF mode for full 9-axis calibration
+- Calibration persists across power cycles when saved to file
+- System calibration status should reach ``3/3`` before saving
 
 IMU Handler Task
 ----------------
