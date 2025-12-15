@@ -1,6 +1,32 @@
 """
-IMU_V1.py – BNO055 IMU driver (MicroPython, software I2C on B13/B14)
-IMPROVED: Better timeout handling and recovery
+BNO055 IMU driver with software I2C implementation for MicroPython.
+
+This module provides a robust driver for the Bosch BNO055 9-DOF absolute orientation
+sensor, implementing software I2C with improved timeout handling and bus recovery.
+The BNO055 combines a triaxial accelerometer, gyroscope, and magnetometer with an
+ARM Cortex M0+ processor running sensor fusion algorithms.
+
+Hardware:
+    - Sensor: BNO055 9-axis absolute orientation sensor
+    - Interface: Software I2C on pins B13 (SCL) and B14 (SDA)
+    - Reset Pin: B15 (active low)
+    - I2C Address: 0x28 (default) or 0x29 (alternate)
+    - Operating Mode: NDOF (9-DOF fusion with magnetometer)
+
+Features:
+    - Software I2C with configurable timing
+    - Automatic bus recovery from communication errors
+    - Calibration profile save/load capability
+    - Euler angle output (heading, roll, pitch)
+    - Angular velocity output (gyro rates)
+    - Retry logic with exponential backoff
+    - Auto-detection of I2C address
+
+Notes:
+    - Heading range: 0-360 degrees (0 = North in NDOF mode)
+    - Angular rates: degrees per second
+    - Calibration status: 0 (uncalibrated) to 3 (fully calibrated)
+    - Software I2C delay: 150 µs (tuned for reliability)
 """
 
 import pyb
@@ -51,18 +77,34 @@ PWR_NORMAL         = const(0x00)
 
 
 class SoftI2C:
-    """Software I2C implementation with improved timeout handling"""
-    
+    """
+    Software I2C implementation with improved timeout handling and bus recovery.
+
+    Implements bit-banged I2C protocol on arbitrary GPIO pins with configurable timing.
+    Includes bus reset capability to recover from communication errors.
+    """
+
     def __init__(self, scl_pin, sda_pin, delay_us=50):
-        """Initialize with pin names and timing delay"""
+        """
+        Initialize software I2C with pin names and timing delay.
+
+        Args:
+            scl_pin (str): SCL pin name (e.g., 'B13')
+            sda_pin (str): SDA pin name (e.g., 'B14')
+            delay_us (int): Bit timing delay in microseconds (default: 50)
+        """
         self.scl = Pin(scl_pin, Pin.OUT_OD)
         self.sda = Pin(sda_pin, Pin.OUT_OD)
         self.scl.high()
         self.sda.high()
         self.delay = delay_us  # Increased default for reliability
-    
+
     def _start(self):
-        """I2C START condition"""
+        """
+        Generate I2C START condition.
+
+        START: SDA falls while SCL is high.
+        """
         self.sda.high()
         self.scl.high()
         sleep_us(self.delay)
@@ -70,9 +112,13 @@ class SoftI2C:
         sleep_us(self.delay)
         self.scl.low()
         sleep_us(self.delay)
-    
+
     def _stop(self):
-        """I2C STOP condition"""
+        """
+        Generate I2C STOP condition.
+
+        STOP: SDA rises while SCL is high.
+        """
         self.scl.low()
         sleep_us(self.delay)
         self.sda.low()
@@ -81,9 +127,13 @@ class SoftI2C:
         sleep_us(self.delay)
         self.sda.high()
         sleep_us(self.delay)
-    
+
     def _repeated_start(self):
-        """I2C REPEATED START condition"""
+        """
+        Generate I2C REPEATED START condition.
+
+        Used to change direction from write to read without releasing the bus.
+        """
         self.scl.low()
         sleep_us(self.delay)
         self.sda.high()
@@ -94,9 +144,14 @@ class SoftI2C:
         sleep_us(self.delay)
         self.scl.low()
         sleep_us(self.delay)
-    
+
     def _write_bit(self, bit):
-        """Write one bit"""
+        """
+        Write a single bit to the I2C bus.
+
+        Args:
+            bit (int): Bit value (0 or 1)
+        """
         if bit:
             self.sda.high()
         else:
@@ -106,9 +161,14 @@ class SoftI2C:
         sleep_us(self.delay * 2)
         self.scl.low()
         sleep_us(self.delay)
-    
+
     def _read_bit(self):
-        """Read one bit"""
+        """
+        Read a single bit from the I2C bus.
+
+        Returns:
+            int: Bit value (0 or 1)
+        """
         self.sda.high()
         sleep_us(self.delay)
         self.scl.high()
@@ -118,24 +178,45 @@ class SoftI2C:
         self.scl.low()
         sleep_us(self.delay)
         return bit
-    
+
     def _write_byte(self, byte):
-        """Write one byte, return ACK bit"""
+        """
+        Write one byte to the I2C bus and read ACK.
+
+        Args:
+            byte (int): Byte value (0-255)
+
+        Returns:
+            bool: True if ACK received, False if NACK
+        """
         for i in range(8):
             self._write_bit((byte >> (7 - i)) & 1)
         ack = not self._read_bit()
         return ack
-    
+
     def _read_byte(self, ack):
-        """Read one byte, send ACK/NACK"""
+        """
+        Read one byte from the I2C bus and send ACK/NACK.
+
+        Args:
+            ack (bool): True to send ACK, False to send NACK
+
+        Returns:
+            int: Byte value (0-255)
+        """
         byte = 0
         for i in range(8):
             byte = (byte << 1) | self._read_bit()
         self._write_bit(not ack)
         return byte
-    
+
     def _bus_reset(self):
-        """Reset the I2C bus - clock out up to 9 bits"""
+        """
+        Reset the I2C bus by clocking out up to 9 bits.
+
+        Forces any stuck slave device to release the bus by completing
+        any partial byte transfer.
+        """
         self.sda.high()
         for _ in range(9):
             self.scl.high()
@@ -143,51 +224,74 @@ class SoftI2C:
             self.scl.low()
             sleep_us(self.delay)
         self._stop()
-    
+
     def mem_read(self, nbytes, addr, reg):
-        """Read nbytes from register with bus recovery"""
+        """
+        Read multiple bytes from a device register with automatic bus recovery.
+
+        Args:
+            nbytes (int): Number of bytes to read
+            addr (int): I2C device address (7-bit)
+            reg (int): Register address to read from
+
+        Returns:
+            bytes: Data read from register
+
+        Raises:
+            OSError: If communication fails after bus recovery attempt
+        """
         try:
             self._start()
             if not self._write_byte((addr << 1) | 0):
                 self._stop()
                 raise OSError("No ACK on address write")
-            
+
             if not self._write_byte(reg):
                 self._stop()
                 raise OSError("No ACK on register write")
-            
+
             self._repeated_start()
             if not self._write_byte((addr << 1) | 1):
                 self._stop()
                 raise OSError("No ACK on address read")
-            
+
             data = []
             for i in range(nbytes):
                 data.append(self._read_byte(i < nbytes - 1))
-            
+
             self._stop()
             return bytes(data)
         except Exception as e:
             self._bus_reset()
             raise e
-    
+
     def mem_write(self, data, addr, reg):
-        """Write data to register with bus recovery"""
+        """
+        Write multiple bytes to a device register with automatic bus recovery.
+
+        Args:
+            data (bytes): Data to write
+            addr (int): I2C device address (7-bit)
+            reg (int): Register address to write to
+
+        Raises:
+            OSError: If communication fails after bus recovery attempt
+        """
         try:
             self._start()
             if not self._write_byte((addr << 1) | 0):
                 self._stop()
                 raise OSError("No ACK on address write")
-            
+
             if not self._write_byte(reg):
                 self._stop()
                 raise OSError("No ACK on register write")
-            
+
             for byte in data:
                 if not self._write_byte(byte):
                     self._stop()
                     raise OSError("No ACK on data write")
-            
+
             self._stop()
         except Exception as e:
             self._bus_reset()
@@ -195,25 +299,48 @@ class SoftI2C:
 
 
 def _le_i16(b):
-    """bytes->int16 little-endian"""
+    """
+    Convert 2-byte little-endian bytes to signed 16-bit integer.
+
+    Args:
+        b (bytes): 2-byte sequence in little-endian format
+
+    Returns:
+        int: Signed 16-bit integer value
+    """
     return struct.unpack('<h', b)[0]
 
 
 class BNO055:
-    """Driver for BNO055 using software I2C on arbitrary pins"""
+    """
+    Driver for BNO055 9-axis absolute orientation sensor using software I2C.
 
-    def __init__(self, scl_pin, sda_pin, addr=BNO055_ADDRESS_A, 
+    Provides access to Euler angles, angular velocities, calibration status,
+    and calibration profile management. Implements robust communication with
+    automatic retry and bus recovery.
+
+    Attributes:
+        i2c (SoftI2C): Software I2C bus instance
+        addr (int): Active I2C device address
+    """
+
+    def __init__(self, scl_pin, sda_pin, addr=BNO055_ADDRESS_A,
                  autodetect=True, retries=10, retry_delay_ms=20):
         """
-        Initialize with SCL and SDA pin names (strings like 'B13', 'B14')
-        
+        Initialize BNO055 with software I2C on specified pins.
+
+        Automatically detects device, verifies chip ID, and configures for NDOF mode.
+
         Args:
-            scl_pin: SCL pin name (e.g., 'B13')
-            sda_pin: SDA pin name (e.g., 'B14')
-            addr: I2C address (0x28 or 0x29)
-            autodetect: Try both addresses if chip ID doesn't match
-            retries: Number of retry attempts for I2C operations
-            retry_delay_ms: Delay between retries (increased for stability)
+            scl_pin (str): SCL pin name (e.g., 'B13')
+            sda_pin (str): SDA pin name (e.g., 'B14')
+            addr (int): I2C address (0x28 or 0x29, default: 0x28)
+            autodetect (bool): Try both addresses if chip ID doesn't match (default: True)
+            retries (int): Number of retry attempts for I2C operations (default: 10)
+            retry_delay_ms (int): Delay between retries in milliseconds (default: 20)
+
+        Raises:
+            RuntimeError: If BNO055 not detected or wrong chip ID
         """
         self.i2c = SoftI2C(scl_pin, sda_pin, delay_us=150)  # Increased from 100
         self.addr = addr
@@ -226,7 +353,7 @@ class BNO055:
             chip = self._mem_read(1, REG_CHIP_ID)[0]
         except OSError:
             chip = 0
-        
+
         if chip != 0xA0 and autodetect:
             for candidate in (BNO055_ADDRESS_A, BNO055_ADDRESS_B):
                 if candidate != self.addr:
@@ -237,7 +364,7 @@ class BNO055:
                             break
                     except OSError:
                         pass
-        
+
         if chip != 0xA0:
             pyb.delay(700)
             chip = self._mem_read(1, REG_CHIP_ID)[0]
@@ -260,12 +387,28 @@ class BNO055:
     # ── Public API ────────────────────────────────────────────────────────
 
     def set_mode(self, fusion_mode):
-        """Change the operating mode"""
+        """
+        Change the BNO055 operating mode.
+
+        Args:
+            fusion_mode (int): Operating mode constant (MODE_NDOF, MODE_IMU, etc.)
+        """
         self._set_mode_internal(MODE_CONFIG)
         self._set_mode_internal(fusion_mode)
 
     def get_calibration_status(self):
-        """Return dict with calibration status"""
+        """
+        Get calibration status for all sensor subsystems.
+
+        Returns:
+            dict: Calibration status with keys 'sys', 'gyro', 'accel', 'mag'.
+                  Each value ranges from 0 (uncalibrated) to 3 (fully calibrated).
+
+        Example:
+            >>> status = imu.get_calibration_status()
+            >>> print(status)
+            {'sys': 3, 'gyro': 3, 'accel': 3, 'mag': 3}
+        """
         val = self._mem_read(1, REG_CALIB_STAT)[0]
         sys  = (val >> 6) & 0x03
         gyro = (val >> 4) & 0x03
@@ -274,7 +417,15 @@ class BNO055:
         return {"sys": sys, "gyro": gyro, "accel": accel, "mag": mag}
 
     def read_calibration_blob(self):
-        """Read calibration coefficients (22 bytes) as binary"""
+        """
+        Read calibration coefficients from BNO055 as binary blob.
+
+        Temporarily switches to CONFIG mode, reads 22-byte calibration data,
+        then restores previous operating mode.
+
+        Returns:
+            bytes: 22-byte calibration blob
+        """
         cur_mode = self._get_mode()
         try:
             self._set_mode_internal(MODE_CONFIG)
@@ -285,7 +436,18 @@ class BNO055:
             self._set_mode_internal(cur_mode)
 
     def write_calibration_blob(self, blob):
-        """Write calibration coefficients (exactly 22 bytes)"""
+        """
+        Write calibration coefficients to BNO055 from binary blob.
+
+        Temporarily switches to CONFIG mode, writes 22-byte calibration data,
+        then restores previous operating mode.
+
+        Args:
+            blob (bytes): Exactly 22 bytes of calibration data
+
+        Raises:
+            ValueError: If blob is not exactly 22 bytes
+        """
         if not isinstance(blob, (bytes, bytearray)) or len(blob) != CALIB_BLOB_LEN:
             raise ValueError("Calibration blob must be 22 bytes long")
 
@@ -301,7 +463,15 @@ class BNO055:
         pyb.delay(25)
 
     def read_euler(self):
-        """Read Euler angles (heading, roll, pitch) in degrees"""
+        """
+        Read Euler angles from BNO055.
+
+        Returns:
+            tuple: (heading, roll, pitch) in degrees
+                - heading: 0-360° (yaw, compass heading)
+                - roll: -180 to +180° (rotation about X-axis)
+                - pitch: -90 to +90° (rotation about Y-axis)
+        """
         raw = self._mem_read(6, REG_EUL_HEADING_LSB)
         h = _le_i16(raw[0:2]) / 16.0
         r = _le_i16(raw[2:4]) / 16.0
@@ -309,11 +479,26 @@ class BNO055:
         return (h, r, p)
 
     def get_heading(self):
-        """Convenience: return heading (yaw) in degrees"""
+        """
+        Get heading (yaw) angle in degrees.
+
+        Convenience function that extracts only the heading from Euler angles.
+
+        Returns:
+            float: Heading in degrees (0-360°, 0 = North in NDOF mode)
+        """
         return self.read_euler()[0]
 
     def read_angular_velocity(self):
-        """Read angular velocity (gx, gy, gz) in deg/s"""
+        """
+        Read angular velocity (gyro rates) from BNO055.
+
+        Returns:
+            tuple: (gx, gy, gz) angular velocities in degrees per second
+                - gx: Roll rate (rotation about X-axis)
+                - gy: Pitch rate (rotation about Y-axis)
+                - gz: Yaw rate (rotation about Z-axis)
+        """
         raw = self._mem_read(6, REG_GYR_DATA_X_LSB)
         gx = _le_i16(raw[0:2]) / 16.0
         gy = _le_i16(raw[2:4]) / 16.0
@@ -321,16 +506,34 @@ class BNO055:
         return (gx, gy, gz)
 
     def get_yaw_rate(self):
-        """Convenience: return gz (yaw rate) in deg/s"""
+        """
+        Get yaw rate (angular velocity about Z-axis) in degrees per second.
+
+        Convenience function that extracts only the yaw rate from angular velocities.
+
+        Returns:
+            float: Yaw rate in degrees per second (positive = counter-clockwise)
+        """
         return self.read_angular_velocity()[2]
 
     # ── Low-Level Helpers ─────────────────────────────────────────────────
 
     def _get_mode(self):
+        """
+        Internal: Read current operating mode register.
+
+        Returns:
+            int: Current operating mode
+        """
         return self._mem_read(1, REG_OPR_MODE)[0]
 
     def _set_mode_internal(self, mode):
-        """Internal: write OPR_MODE with delays"""
+        """
+        Internal: Write operating mode register with appropriate delays.
+
+        Args:
+            mode (int): Operating mode constant
+        """
         self._mem_write(bytes([mode]), REG_OPR_MODE)
         if mode == MODE_CONFIG:
             pyb.delay(25)
@@ -338,10 +541,19 @@ class BNO055:
             pyb.delay(10)
 
     def _mem_write(self, data, reg):
-        """Write bytes to register with improved retry logic"""
+        """
+        Internal: Write bytes to register with retry logic and exponential backoff.
+
+        Args:
+            data (bytes): Data to write
+            reg (int): Register address
+
+        Raises:
+            OSError: If all retry attempts fail
+        """
         if not isinstance(data, (bytes, bytearray)):
             data = bytes([data])
-        
+
         last_err = None
         for attempt in range(self._retries):
             try:
@@ -354,11 +566,23 @@ class BNO055:
                 # Longer delay on repeated errors
                 delay = self._retry_delay_ms * (attempt + 1)
                 pyb.delay(min(delay, 100))  # Cap at 100ms
-        
+
         raise last_err
 
     def _mem_read(self, nbytes, reg):
-        """Read bytes from register with improved retry logic"""
+        """
+        Internal: Read bytes from register with retry logic and exponential backoff.
+
+        Args:
+            nbytes (int): Number of bytes to read
+            reg (int): Register address
+
+        Returns:
+            bytes: Data read from register
+
+        Raises:
+            OSError: If all retry attempts fail
+        """
         last_err = None
         for attempt in range(self._retries):
             try:
@@ -371,5 +595,5 @@ class BNO055:
                 # Longer delay on repeated errors
                 delay = self._retry_delay_ms * (attempt + 1)
                 pyb.delay(min(delay, 100))  # Cap at 100ms
-        
+
         raise last_err

@@ -64,9 +64,4 @@ Position-based navigation logic using global X, Y coordinates from the observer 
 Main (Original)
 ---------------
 
-Task coordination and cooperative scheduler setup for the original approach.
-
 .. automodule:: defunct_main
-   :members:
-   :undoc-members:
-   :show-inheritance:
