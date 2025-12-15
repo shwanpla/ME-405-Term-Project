@@ -197,15 +197,15 @@ This approach combined sensor fusion with line following to handle multi-segment
 Reference Implementation
 -------------------------
 
-The complete original implementation is preserved in :code:`src/original_approach/` and includes:
+The complete original implementation is preserved with the :code:`defunct_` prefix in :code:`src/` and includes:
 
-- :code:`observer_fcn.py` — State-space dynamics and output equations
-- :code:`RK4_solver.py` — 4th-order Runge-Kutta integrator
-- :code:`IMU_driver.py` — Bit-banged I²C and BNO055 interface
-- :code:`CalibrationManager.py` — Calibration blob persistence
-- :code:`IMU_handler.py` — Startup FSM and initialization
-- :code:`navigation_original.py` — Position-based navigation logic
-- :code:`main_original.py` — Task coordination and scheduler setup
+- :code:`defunct_observer_fcn.py` — State-space dynamics and output equations
+- :code:`defunct_rk4_solver.py` — 4th-order Runge-Kutta integrator
+- :code:`defunct_IMU_driver.py` — Bit-banged I²C and BNO055 interface
+- :code:`defunct_CalibrationManager.py` — Calibration blob persistence
+- :code:`defunct_IMU_handler.py` — Startup FSM and initialization
+- :code:`defunct_navigation.py` — Position-based navigation logic
+- :code:`defunct_main.py` — Task coordination and scheduler setup
 
 .. seealso::
    Full API documentation for these modules is available in :doc:`original_approach_api`.
@@ -217,13 +217,13 @@ Issues Encountered and Pivot to Displacement-Based Approach
 IMU Communication Reliability
 ------------------------------
 
-Despite implementing retry logic, bus recovery, and extensive calibration management, the BNO055 exhibited intermittent I²C communication failures during critical phases of the run. These failures manifested as:
+The team invested substantial effort into making the IMU-based approach work reliably. This included implementing sophisticated retry logic, bus recovery mechanisms, and extensive calibration management infrastructure. Despite these efforts and many hours of debugging and refinement, the BNO055 exhibited intermittent I²C communication failures during critical phases of the run. These failures manifested as:
 
 - Register read timeouts mid-trial
 - Incorrect heading values due to incomplete transactions
 - Bus lockup requiring hardware reset
 
-The root cause was traced to timing sensitivity in the bit-banged I²C implementation combined with electromagnetic interference from motor PWM and power supply transients. While the system worked reliably in static conditions, dynamic motor operation introduced sufficient noise to corrupt I²C transactions unpredictably.
+Through systematic debugging with oscilloscope measurements and logging, the root cause was traced to timing sensitivity in the bit-banged I²C implementation combined with electromagnetic interference from motor PWM and power supply transients. While the system worked reliably in static conditions and benchtop testing, dynamic motor operation introduced sufficient noise to corrupt I²C transactions unpredictably. Multiple attempts were made to resolve this through improved shielding, I²C timing adjustments, and filtering, but the reliability issues persisted under full operational conditions.
 
 Calibration Drift and Magnetic Interference
 --------------------------------------------
@@ -239,11 +239,12 @@ This drift caused the position estimate to accumulate error over the course of a
 Decision to Refactor
 ---------------------
 
-Given the time constraints and the need for robust, repeatable performance, the team decided to pivot to a simpler displacement-based odometry approach that did not rely on the IMU. This decision prioritized:
+After extensive troubleshooting and multiple attempts to achieve reliable IMU operation, the team made the difficult decision to pivot to a simpler displacement-based odometry approach. This was not an abandonment of the sophisticated state estimation framework, but rather a pragmatic response to persistent hardware reliability issues that could not be resolved within project time constraints. The substantial groundwork in observer design, sensor fusion theory, and RK4 integration provided valuable insights that informed the final implementation. The decision prioritized:
 
 - Reliability over theoretical optimality
 - Encoder-only state estimation with known accuracy
 - Removal of I²C communication as a single point of failure
+- Preservation of lessons learned from the observer-based approach
 
 =============================
 Final Approach: Displacement-Based Odometry
@@ -363,7 +364,7 @@ where :math:`p_i` are the sensor position weights. The signed line error is then
 
    e_\mathrm{line} = c - c_0
 
-This single scalar error gives the controller a continuous measure of how far the line is from the center of the array, with sign indicating which direction the robot must steer to re center.
+This single scalar error gives the controller a continuous measure of how far the line is from the center of the array, with sign indicating which direction the robot must steer to recenter.
 
 Velocity PI control and steering injection
 ------------------------------------------
@@ -399,7 +400,7 @@ To maintain stability across aggressive maneuvers, the program tracks saturation
 Tuning workflow and physical validation
 ---------------------------------------
 
-At this phase of the term, most iteration time was spent converting these computations into reliable physical performance. We tuned :math:`K_p` and :math:`K_i` for stable speed tracking, then tuned :math:`K_\ell` and :math:`K_{\ell i}` so the robot continuously re centered on the tape without oscillation, overshoot, or drift. Each trial around the black circle was evaluated using the telemetry stream and direct observation. We looked for the same signatures in the data every run: bounded line error, stable encoder speed, limited saturation time, and consistent centroid convergence after disturbances. Once the robot could follow the circle repeatedly, we had a validated sensing and control foundation that supported the later navigation logic used on the obstacle course.
+At this phase of the term, most iteration time was spent converting these computations into reliable physical performance. We tuned :math:`K_p` and :math:`K_i` for stable speed tracking, then tuned :math:`K_\ell` and :math:`K_{\ell i}` so the robot continuously recentered on the tape without oscillation, overshoot, or drift. Each trial around the black circle was evaluated using the telemetry stream and direct observation. We looked for the same signatures in the data every run: bounded line error, stable encoder speed, limited saturation time, and consistent centroid convergence after disturbances. Once the robot could follow the circle repeatedly, we had a validated sensing and control foundation that supported the later navigation logic used on the obstacle course.
 
 .. image:: /images/team_line_follow_tuning.png
    :width: 900px
