@@ -443,24 +443,22 @@ Odometry Calculations
 **Distance Traveled**
 
 .. math::
-
-   \text{distance} = \frac{\text{left\_ticks} + \text{right\_ticks}}{2.0} \times \text{MM\_PER\_TICK}
+   	ext{distance} = \frac{\text{\texttt{left\_ticks}} + \text{\texttt{right\_ticks}}}{2.0} \times \text{\texttt{MM\_PER\_TICK}}
 
 Average of both encoders smooths odometry error and provides forward displacement in millimeters.
 
 **Heading Angle**
 
 .. math::
-
-   \text{tick\_diff} = \text{left\_ticks} - \text{right\_ticks}
-
-.. math::
-
-   \text{heading\_rad} = \frac{\text{tick\_diff}}{\text{TICKS\_PER\_REV}} \times \frac{\text{WHEEL\_CIRC\_MM}}{\text{TRACK\_WIDTH\_MM}}
+   	ext{\texttt{tick\_diff}} = \text{\texttt{left\_ticks}} - \text{\texttt{right\_ticks}}
 
 .. math::
 
-   \text{heading\_deg} = \text{heading\_rad} \times \frac{180}{\pi}
+   	ext{\texttt{heading\_rad}} = \frac{\text{\texttt{tick\_diff}}}{\text{\texttt{TICKS\_PER\_REV}}} \times \frac{\text{\texttt{WHEEL\_CIRC\_MM}}}{\text{\texttt{TRACK\_WIDTH\_MM}}}
+
+.. math::
+
+   	ext{\texttt{heading\_deg}} = \text{\texttt{heading\_rad}} \times \frac{180}{\pi}
 
 Positive heading indicates counter-clockwise rotation (left turn).
 
