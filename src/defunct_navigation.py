@@ -1,15 +1,130 @@
 """
-This task will implement different modes and settings for navigation at each stage of the course.
-It will use the CL_control_task to control the motors based on the navigation requirements.
+Position-based navigation task for obstacle course using observer state estimation.
 
-State 0: Start line following at bias = 0 for 10 seconds
-State 1: Line following at bias = 1.55 for 3 seconds
-State 2: Switch bias to 0, reorient to 90 degrees, go in straight line for 6 seconds, maintaining heading
-State 3: Standard line following with bias = 0
-State 4: Placeholder for future waypoint navigation
+This module implements a cooperative multitasking navigation function that uses global
+X, Y coordinates from the state observer and IMU heading to navigate an obstacle course.
+The navigation task coordinates line following, heading control, and state transitions
+based on position thresholds and heading targets.
+
+States:
+    - State 0: Line following with dynamic bias control based on X position
+    - State 1: Line following with heading adjustment to 90 degrees
+    - State 2: Straight line movement maintaining 90-degree heading
+    - State 3: Standard line following with zero bias
+    - State 4: Placeholder for future waypoint navigation
+
+Hardware:
+    - Observer: Provides global X, Y position estimates
+    - IMU: Provides heading and yaw rate measurements
+    - IR Sensor Array: Line detection for line following mode
+    - Motors: Differential drive with velocity control
+
+Notes:
+    - Uses position-based state transitions (X, Y thresholds)
+    - Observer calibration must complete before navigation begins
+    - Heading control uses IMU-based angle with tolerance band
+    - Bias values adjust line following behavior for curves
 """
 
 def navigation_task_fun(shares):
+    """
+    Cooperative task function implementing position-based obstacle course navigation.
+
+    Implements a 5-state finite state machine that uses observer-estimated X, Y coordinates
+    and IMU heading to navigate the obstacle course. Coordinates line following, heading
+    control, and straight-line movement based on position thresholds.
+
+    Args:
+        shares (tuple): Task shared variables containing navigation state and control
+            - line_follow_flg (Share): Enable/disable line following (0 or 1)
+            - big_X_share (Share): Observer X position estimate (mm)
+            - big_Y_share (Share): Observer Y position estimate (mm)
+            - obs_heading_share (Share): Observer heading estimate (degrees)
+            - obs_yaw_rate_share (Share): Observer yaw rate estimate (deg/s)
+            - left_controller_share (Share): Left motor controller object
+            - right_controller_share (Share): Right motor controller object
+            - left_set_point (Share): Left motor control effort output
+            - right_set_point (Share): Right motor control effort output
+            - left_desired_vel (Share): Left motor velocity setpoint
+            - right_desired_vel (Share): Right motor velocity setpoint
+            - desired_angle_share (Share): Target heading for heading control (degrees)
+            - nav_rest_flg (Share): Navigation rest flag
+            - end_flg (Share): End flag to stop navigation
+            - bias_share (Share): Line following bias (-3 to +3)
+            - force_straight_flg (Share): Force straight mode (disable line following)
+            - bias_timer_flg (Share): Bias timer flag
+            - nav_stop_flg (Share): Navigation stop flag
+            - calibration_flg (Share): Observer calibration status (0-3)
+            - nav_turn_flg (Share): Enable heading-based turning
+
+    Yields:
+        int: Current state number (0-4)
+
+    State Machine:
+        **State 0: Line Following with Dynamic Bias**
+            - Initial line following mode
+            - Bias = 0.0 initially, switches to 1.55 when X > 550mm
+            - Transition: When Y < 685mm, move to State 1
+
+        **State 1: Heading Adjustment**
+            - Line following with simultaneous heading control
+            - Target heading: 90 degrees
+            - Bias reset to 0.0
+            - nav_turn_flg enabled for heading control
+            - Transition: When |heading_error| < 4°, move to State 2
+
+        **State 2: Straight Line at 90 Degrees**
+            - Disable line following, enable force_straight mode
+            - Maintain 90-degree heading using heading control
+            - Transition: When Y < 500mm, move to State 3
+
+        **State 3: Standard Line Following**
+            - Line following mode with zero bias
+            - Force straight disabled
+            - Final navigation state for course completion
+
+        **State 4: Placeholder**
+            - Reserved for future waypoint navigation
+            - Currently inactive
+
+    Position Thresholds:
+        - BIAS_SWITCH_X = 550.0mm: Switch to left bias when exceeded
+        - STATE_2_Y = 685.0mm: Transition to heading adjustment
+        - STATE_3_Y = 500.0mm: Transition to final line following
+        - HEADING_ERROR_TOLERANCE = 4.0°: Heading control tolerance
+
+    Bias Values:
+        - left_bias_value = 1.55: Bias for left curve navigation
+        - center_bias_value = 0.0: No bias (centered line following)
+
+    Observer Initialization:
+        The task waits for observer calibration (calibration_flg == 3) and
+        initial position estimate (Y > 700mm) before enabling state transitions.
+        This prevents false transitions during startup.
+
+    Control Flags:
+        - line_follow_flg: Enables IR sensor-based line following
+        - force_straight_flg: Disables line following, uses heading control only
+        - nav_turn_flg: Enables heading-based turning control
+        - bias_share: Adjusts line following steering (-3=left, 0=center, +3=right)
+
+    Example Console Output:
+        >>> [NAV_TASK] STATE 0 - X: 234.5 Y: 756.2 Heading: 12.3° Bias: 0.000
+        >>> [NAV_TASK] X > 550 - Switching to bias 1.55
+        >>> [NAV_TASK] STATE 0 - X: 567.8 Y: 723.1 Heading: 45.6° Bias: 1.550
+        >>> [NAV_TASK] Y < 685 - Transitioning to STATE 1 (heading adjustment)
+        >>> [NAV_TASK] STATE 1 - X: 589.2 Y: 672.3 Heading: 78.9° (Target: 90.0°) Error: 11.1°
+        >>> [NAV_TASK] Heading reached 90° - Transitioning to STATE 2 (straight line)
+        >>> [NAV_TASK] STATE 2 - X: 612.4 Y: 543.7 Heading: 91.2°
+        >>> [NAV_TASK] Y < 500 - Transitioning to STATE 3 (line following)
+        >>> [NAV_TASK] STATE 3 - X: 645.8 Y: 456.9 Heading: 88.7°
+
+    Notes:
+        - State transitions are one-way (cannot return to previous states)
+        - Observer must complete calibration before navigation begins
+        - Heading error calculation handles 360/0 wraparound
+        - Debug printing occurs every 10th iteration to reduce output
+    """
     (line_follow_flg, big_X_share, big_Y_share,
     obs_heading_share, obs_yaw_rate_share, 
     left_controller_share, right_controller_share,

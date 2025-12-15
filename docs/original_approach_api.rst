@@ -291,41 +291,643 @@ The calibration file stores 22 bytes as a hexadecimal string:
 IMU Handler Task
 ----------------
 
+Provides cooperative multitasking functions for managing BNO055 IMU initialization, calibration persistence, and continuous sensor data reading. The calibration task implements a state machine for automatic calibration management, while the monitor task provides continuous heading and yaw rate updates with heading unwrapping.
+
 .. automodule:: defunct_IMU_handler
    :members:
    :undoc-members:
    :show-inheritance:
 
-Implements a 4-state startup sequence:
+Calibration Task Function
+""""""""""""""""""""""""""
 
-1. **STATE_INIT**: Check for existing calibration file
-2. **STATE_LOAD**: Load calibration if available
-3. **STATE_MANUAL_CAL**: User-guided manual calibration (if needed)
-4. **STATE_READY**: Calibration complete, signal readiness via share
+.. py:function:: calibration_task_fun(shares)
 
-Also provides:
+   Cooperative task function implementing IMU calibration state machine.
 
-**Function**: ``imu_monitor_task_fun(shares)``
+   Manages the complete IMU initialization and calibration workflow using a 6-state finite state machine. Automatically detects existing calibration files, loads calibration if available, or guides the user through manual calibration if needed.
 
-Continuous task that:
-   - Reads Euler angles from IMU at periodic intervals
-   - Computes continuous (unwrapped) heading from incremental yaw
-   - Outputs heading and yaw rate via task shares for navigation/control
+   :param shares: Task shares (currently unused, reserved for future use)
+   :type shares: tuple
+   :yields: Current state number (0-5)
+   :ytype: int
 
-Shares:
-   - ``imu_heading_share``: Current heading (degrees, unwrapped)
-   - ``imu_yaw_rate_share``: Angular velocity (deg/s)
-   - ``imu_ready_share``: Calibration complete flag
+   **State Machine:**
+
+   - **S_INIT (0)**: Initialize BNO055 hardware and reset pin
+   - **S_CHECK_FILE (1)**: Check for existing calibration.txt file
+   - **S_LOAD_CALIB (2)**: Load calibration from file
+   - **S_MANUAL_CALIB (3)**: Manual calibration mode (rotate IMU)
+   - **S_SAVE_CALIB (4)**: Save calibration to file
+   - **S_DONE (5)**: Calibration complete, idle state
+
+   **Hardware Setup:**
+
+   - Reset pin B15: Pulsed low then high to reset BNO055
+   - I2C pins B13/B14: Software I2C communication
+   - I2C address: 0x28 (default)
+
+   **Calibration Requirements:**
+
+   - System calibration status must reach 3/3
+   - IMU must be rotated in all directions during manual calibration
+   - Calibration data saved to calibration.txt for persistence
+
+   **Example Console Output**::
+
+      ==================================================
+      === BNO055 Initialization ===
+      ==================================================
+      [OK] BNO055 hardware initialized
+
+      === Checking for Calibration File ===
+      [INFO] calibration.txt not found
+      Manual calibration required (rotate IMU in all directions)
+
+      === Manual Calibration Mode ===
+      Waiting for full calibration (Sys: 3/3)...
+      Rotate the IMU slowly in all directions...
+      [OK] Fully calibrated! (Sys: 3/3)
+
+      === Saving Calibration ===
+      ✓ Calibration saved to calibration.txt
+
+      ==================================================
+      === Calibration Complete - Starting Main Loop ===
+      ==================================================
+
+IMU Monitor Task Function
+""""""""""""""""""""""""""
+
+.. py:function:: imu_monitor_task_fun(shares)
+
+   Cooperative task function for continuous IMU data monitoring with heading unwrapping.
+
+   Alternately reads heading and yaw rate from the BNO055 IMU, updating shared variables for navigation and control tasks. Implements heading unwrapping to produce continuous heading values that do not wrap at 0/360 degrees.
+
+   :param shares: Task shared variables
+   :type shares: tuple
+
+   **Shared Variables:**
+
+   - ``shares[0]`` (Share): IMU object share (BNO055 instance)
+   - ``shares[1]`` (Share): Continuous heading output (float, degrees)
+   - ``shares[2]`` (Share): Yaw rate output (float, deg/s)
+
+   :yields: None (yields control to scheduler after each sensor read)
+
+   **Heading Unwrapping Algorithm:**
+
+   The function maintains a continuous heading by detecting and correcting wraparound at the 0/360 degree boundary:
+
+   1. Read raw heading from IMU (0-360 degrees)
+   2. Calculate delta from previous reading
+   3. Detect wraparound:
+
+      - If delta > 180: Crossed from 359 to 0 (subtract 360)
+      - If delta < -180: Crossed from 0 to 359 (add 360)
+
+   4. Add corrected delta to continuous heading
+   5. Update previous heading for next iteration
+
+   **Example Unwrapping:**
+
+   .. code-block:: python
+
+      # Heading crosses from 359° to 1°
+      # Raw IMU readings:    359, 360, 0,   1,   2
+      # Continuous output:   359, 360, 360, 361, 362
+
+   **Timing:**
+
+   - Alternates between heading and yaw rate reads each yield
+   - Typical period: 70ms (14.3 Hz update rate)
+
+   **Notes:**
+
+   - Continuous heading can exceed 360° or go negative
+   - Initial heading matches first IMU reading
+   - Yaw rate is read directly without processing
+   - IMU object must be calibrated before this task starts
+
+IMU Handler Workflow
+"""""""""""""""""""""
+
+**System Startup Sequence:**
+
+1. **Hardware Reset**: Pin B15 pulsed low/high to reset BNO055
+2. **I2C Initialization**: Software I2C established on B13/B14
+3. **Calibration Check**: Look for calibration.txt file
+4. **Load or Calibrate**:
+
+   - If file exists: Load calibration coefficients automatically
+   - If no file: Enter manual calibration mode
+
+5. **Manual Calibration** (if needed):
+
+   - User rotates IMU in all directions
+   - System monitors calibration status (0-3 for each subsystem)
+   - Waits for Sys: 3/3 before proceeding
+
+6. **Save Calibration**: Write 22-byte blob to calibration.txt
+7. **Start Monitoring**: Launch imu_monitor_task_fun for continuous data
+
+**Task Integration:**
+
+.. code-block:: python
+
+   # Typical task setup in main program
+   imu_share = task_share.Share('O', name='imu')
+   heading_share = task_share.Share('f', name='heading')
+   yaw_rate_share = task_share.Share('f', name='yaw_rate')
+
+   monitor_task = cotask.Task(
+       imu_monitor_task_fun,
+       name="imu_monitor",
+       priority=3,
+       period=70,
+       shares=(imu_share, heading_share, yaw_rate_share)
+   )
 
 Navigation (Original)
 ---------------------
 
-Position-based navigation logic using global X, Y coordinates from the observer and IMU heading for state transitions.
+Position-based navigation task for obstacle course using observer state estimation. This navigation implementation uses global X, Y coordinates from the state observer and IMU heading to navigate the course through a 5-state finite state machine with position-based transitions.
 
 .. automodule:: defunct_navigation
    :members:
    :undoc-members:
    :show-inheritance:
+
+Navigation Task Function
+"""""""""""""""""""""""""
+
+.. py:function:: navigation_task_fun(shares)
+
+   Cooperative task function implementing position-based obstacle course navigation.
+
+   Implements a 5-state finite state machine that uses observer-estimated X, Y coordinates and IMU heading to navigate the obstacle course. Coordinates line following, heading control, and straight-line movement based on position thresholds.
+
+   :param shares: Task shared variables containing navigation state and control
+   :type shares: tuple
+   :yields: Current state number (0-4)
+   :ytype: int
+
+   **Shared Variables:**
+
+   - ``line_follow_flg`` (Share): Enable/disable line following (0 or 1)
+   - ``big_X_share`` (Share): Observer X position estimate (mm)
+   - ``big_Y_share`` (Share): Observer Y position estimate (mm)
+   - ``obs_heading_share`` (Share): Observer heading estimate (degrees)
+   - ``obs_yaw_rate_share`` (Share): Observer yaw rate estimate (deg/s)
+   - ``left_controller_share`` (Share): Left motor controller object
+   - ``right_controller_share`` (Share): Right motor controller object
+   - ``left_set_point`` (Share): Left motor control effort output
+   - ``right_set_point`` (Share): Right motor control effort output
+   - ``left_desired_vel`` (Share): Left motor velocity setpoint
+   - ``right_desired_vel`` (Share): Right motor velocity setpoint
+   - ``desired_angle_share`` (Share): Target heading for heading control (degrees)
+   - ``nav_rest_flg`` (Share): Navigation rest flag
+   - ``end_flg`` (Share): End flag to stop navigation
+   - ``bias_share`` (Share): Line following bias (-3 to +3)
+   - ``force_straight_flg`` (Share): Force straight mode (disable line following)
+   - ``bias_timer_flg`` (Share): Bias timer flag
+   - ``nav_stop_flg`` (Share): Navigation stop flag
+   - ``calibration_flg`` (Share): Observer calibration status (0-3)
+   - ``nav_turn_flg`` (Share): Enable heading-based turning
+
+State Machine Details
+""""""""""""""""""""""
+
+**State 0: Line Following with Dynamic Bias**
+
+- Initial line following mode
+- Bias = 0.0 initially, switches to 1.55 when X > 550mm
+- Transition: When Y < 685mm, move to State 1
+
+**State 1: Heading Adjustment**
+
+- Line following with simultaneous heading control
+- Target heading: 90 degrees
+- Bias reset to 0.0
+- ``nav_turn_flg`` enabled for heading control
+- Transition: When |heading_error| < 4°, move to State 2
+
+**State 2: Straight Line at 90 Degrees**
+
+- Disable line following, enable ``force_straight`` mode
+- Maintain 90-degree heading using heading control
+- Transition: When Y < 500mm, move to State 3
+
+**State 3: Standard Line Following**
+
+- Line following mode with zero bias
+- Force straight disabled
+- Final navigation state for course completion
+
+**State 4: Placeholder**
+
+- Reserved for future waypoint navigation
+- Currently inactive
+
+Configuration Parameters
+"""""""""""""""""""""""""
+
+**Position Thresholds:**
+
+.. code-block:: python
+
+   BIAS_SWITCH_X = 550.0     # Switch to left bias when X > 550mm
+   STATE_2_Y = 685.0         # Transition to heading adjustment
+   STATE_3_Y = 500.0         # Transition to final line following
+
+**Heading Control:**
+
+.. code-block:: python
+
+   HEADING_ERROR_TOLERANCE = 4.0  # Degrees tolerance for heading achieved
+
+**Bias Values:**
+
+.. code-block:: python
+
+   left_bias_value = 1.55     # Bias for left curve navigation
+   center_bias_value = 0.0    # No bias (centered line following)
+
+Observer Integration
+""""""""""""""""""""
+
+The navigation task waits for observer initialization before enabling state transitions:
+
+1. **Calibration Check**: ``calibration_flg == 3`` indicates observer is calibrated
+2. **Position Check**: ``Y > 700mm`` indicates valid initial position estimate
+3. **Enable Transitions**: After both conditions met, state transitions become active
+
+This prevents false transitions during system startup when position estimates are initializing.
+
+Control Modes
+"""""""""""""
+
+**Line Following Mode** (``line_follow_flg = 1``)
+   Uses IR sensor centroid with configurable bias for line tracking.
+
+**Force Straight Mode** (``force_straight_flg = 1``)
+   Disables line following, uses pure heading control for straight movement.
+
+**Heading Turn Mode** (``nav_turn_flg = 1``)
+   Enables heading-based PI control for turning to target angle.
+
+**Bias Control** (``bias_share``)
+   Adjusts line following behavior: -3 (left) to 0 (center) to +3 (right).
+
+Example Console Output
+"""""""""""""""""""""""
+
+.. code-block:: text
+
+   [NAV_TASK] STATE 0 - X: 234.5 Y: 756.2 Heading: 12.3° Bias: 0.000
+   [NAV_TASK] X > 550 - Switching to bias 1.55
+   [NAV_TASK] STATE 0 - X: 567.8 Y: 723.1 Heading: 45.6° Bias: 1.550
+   [NAV_TASK] Y < 685 - Transitioning to STATE 1 (heading adjustment)
+   [NAV_TASK] STATE 1 - X: 589.2 Y: 672.3 Heading: 78.9° (Target: 90.0°) Error: 11.1°
+   [NAV_TASK] Heading reached 90° - Transitioning to STATE 2 (straight line)
+   [NAV_TASK] STATE 2 - X: 612.4 Y: 543.7 Heading: 91.2°
+   [NAV_TASK] Y < 500 - Transitioning to STATE 3 (line following)
+   [NAV_TASK] STATE 3 - X: 645.8 Y: 456.9 Heading: 88.7°
+
+Navigation Notes
+""""""""""""""""
+
+- **One-Way Transitions**: State transitions are irreversible (cannot return to previous states)
+- **Observer Dependency**: Navigation requires observer to provide valid X, Y, heading estimates
+- **Heading Wraparound**: Heading error calculation handles 360/0 degree boundary correctly
+- **Debug Output**: Console messages print every 10th iteration to reduce output volume
+- **Coordinate System**: X increases forward, Y increases to the right (course-specific)
+
+State Observer
+--------------
+
+State observer task for robot localization using sensor fusion and RK4 integration. This module implements a cooperative multitasking observer function that fuses IMU heading measurements with encoder velocity data to estimate the robot's global position (X, Y), heading, and arc length traveled.
+
+.. automodule:: defunct_observer_fcn
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Observer Task Function
+"""""""""""""""""""""""
+
+.. py:function:: observer_task_fcn(shares)
+
+   Cooperative task function implementing state observer with RK4 integration.
+
+   Fuses IMU heading measurements with encoder velocity data to estimate the robot's global position, heading, and distance traveled. Uses 4th-order Runge-Kutta numerical integration to solve the robot's kinematic equations, providing accurate state estimation for navigation.
+
+   :param shares: Task shared variables for sensor inputs and state outputs
+   :type shares: tuple
+   :yields: None (yields control to scheduler after each update cycle)
+
+   **Shared Variables (14 inputs/outputs):**
+
+   - ``meas_heading_share`` (Share): IMU heading measurement (degrees)
+   - ``meas_yaw_rate_share`` (Share): IMU yaw rate measurement (deg/s)
+   - ``left_enc_pos`` (Share): Left encoder position (ticks)
+   - ``right_enc_pos`` (Share): Right encoder position (ticks)
+   - ``left_enc_speed`` (Share): Left encoder velocity (ticks/us)
+   - ``right_enc_speed`` (Share): Right encoder velocity (ticks/us)
+   - ``obs_heading_share`` (Share): Observer heading output (degrees)
+   - ``obs_yaw_rate_share`` (Share): Observer yaw rate output (deg/s)
+   - ``left_set_point`` (Share): Left motor control effort
+   - ``right_set_point`` (Share): Right motor control effort
+   - ``observer_calibration_flg`` (Share): Calibration trigger flag (0 or 1)
+   - ``big_X_share`` (Share): Observer X position output (mm)
+   - ``big_Y_share`` (Share): Observer Y position output (mm)
+   - ``initial_heading_share`` (Share): Initial heading reference (degrees)
+   - ``end_flg`` (Share): End flag for debugging output
+
+State Vector
+""""""""""""
+
+The observer maintains a 6-state vector:
+
+.. math::
+
+   \mathbf{x} = \begin{bmatrix} X \\ Y \\ \Theta \\ s \\ \Omega_L \\ \Omega_R \end{bmatrix}
+
+where:
+
+- **X**: Global X position (meters, converted to mm for output)
+- **Y**: Global Y position (meters, converted to mm for output)
+- **Theta**: Heading angle (radians, converted to degrees for output)
+- **s**: Arc length traveled (meters)
+- **Omega_L**: Left wheel velocity (m/s)
+- **Omega_R**: Right wheel velocity (m/s)
+
+Kinematic Model
+"""""""""""""""
+
+The observer uses differential drive kinematics with IMU heading feedback:
+
+.. math::
+
+   v_{center} = \frac{v_L + v_R}{2}
+
+.. math::
+
+   \omega_{body} = \frac{v_R - v_L}{w}
+
+.. math::
+
+   \dot{X} = v_{center} \cos(\theta_{IMU})
+
+.. math::
+
+   \dot{Y} = -v_{center} \sin(\theta_{IMU})
+
+.. math::
+
+   \dot{\theta} = \omega_{body}
+
+.. math::
+
+   \dot{s} = v_{center}
+
+where:
+
+- :math:`v_L, v_R`: Left and right wheel linear velocities (m/s)
+- :math:`w`: Track width (0.141 m)
+- :math:`\theta_{IMU}`: IMU heading measurement (radians)
+
+Calibration Sequence
+""""""""""""""""""""
+
+When ``observer_calibration_flg == 1``, the observer performs initialization:
+
+1. **Read Initial Heading**: Get IMU heading at startup
+2. **Calculate Offset**: Compute correction to align IMU with robot frame (+X = 0°)
+3. **Initialize Position**: Set starting position to (100, 800) mm
+4. **Enable Observer**: Set calibration flag to 0 and begin estimation
+
+Example::
+
+   IMU heading at startup: -79.63°
+   IMU heading offset (to correct to +X = 0°): 79.63° (1.3895 rad)
+   [FIRST_RUN] Observer initialized at (100, 800) mm pointing +X (0°)
+
+IMU Heading Filtering
+""""""""""""""""""""""
+
+Low-pass filter applied to reduce heading jitter:
+
+.. code-block:: python
+
+   heading_filtered = alpha * heading_new + (1 - alpha) * heading_prev
+   # alpha = 0.3 (30% new, 70% previous)
+
+This helps smooth out rapid heading oscillations from IMU noise.
+
+RK4 Integration Parameters
+"""""""""""""""""""""""""""
+
+- **Integration Horizon**: 0 to 100ms
+- **Step Size**: 10ms
+- **Solver**: 4th-order Runge-Kutta (RK4_solver)
+- **Update Rate**: 100ms (observer task period)
+
+Tuning Parameters
+"""""""""""""""""
+
+.. py:data:: VELOCITY_SCALE
+   :type: float
+   :value: 2.0
+
+   Velocity calibration factor to match physical measurements.
+
+   - **Increase** if observer underestimates distance traveled
+   - **Decrease** if observer overestimates distance traveled
+
+.. py:data:: imu_alpha
+   :type: float
+   :value: 0.3
+
+   IMU heading low-pass filter coefficient.
+
+   - **Lower** (e.g., 0.1) = smoother but slower response
+   - **Higher** (e.g., 0.5) = faster response but more noise
+
+Hardware Configuration
+""""""""""""""""""""""
+
+- **IMU**: BNO055 9-DOF sensor for heading measurements
+- **Encoders**: Quadrature encoders on both wheels (1437.1 ticks/rev)
+- **Wheel Diameter**: 70mm (35mm radius)
+- **Track Width**: 141mm
+- **Wheel Circumference**: 0.2199 m
+
+Coordinate Frame
+""""""""""""""""
+
+- **X Axis**: Forward direction of robot at initialization
+- **Y Axis**: Right direction of robot at initialization
+- **Theta**: Counter-clockwise positive from +X axis
+- **Origin**: Initial position (100, 800) mm at startup
+
+Example Console Output
+"""""""""""""""""""""""
+
+.. code-block:: text
+
+   IMU heading at startup: -79.63°
+   IMU heading offset (to correct to +X = 0°): 79.63° (1.3895 rad)
+   [FIRST_RUN] Observer initialized at (100, 800) mm pointing +X (0°)
+
+   X = 567.8 mm, Y = 723.1 mm, Heading = 45.62° (corrected), s = 523.4 mm | v=12.3cm/s
+
+Observer Notes
+""""""""""""""
+
+- **Calibration Required**: Observer must be calibrated before navigation begins
+- **Heading Source**: IMU heading is used directly for X, Y position calculation
+- **Integration Source**: Encoder velocities drive heading integration via RK4
+- **Output Format**: Position in mm, heading in degrees
+- **Update Period**: 100ms observer task period ensures real-time performance
+
+Angle Normalization Function
+"""""""""""""""""""""""""""""
+
+.. py:function:: normalize_angle_deg(angle_deg)
+
+   Normalize angle to [-180, 180] degree range.
+
+   :param angle_deg: Angle in degrees (can be any value)
+   :type angle_deg: float
+   :return: Normalized angle in degrees within [-180, 180]
+   :rtype: float
+
+   **Example**::
+
+      >>> normalize_angle_deg(270.0)
+      -90.0
+      >>> normalize_angle_deg(-190.0)
+      170.0
+
+RK4 Solver
+----------
+
+Lightweight 4th-order Runge-Kutta (RK4) ODE solver for MicroPython + ulab. This module provides numerical integration for systems of ordinary differential equations, designed for embedded control and estimation tasks.
+
+.. automodule:: defunct_rk4_solver
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+RK4 Solver Function
+"""""""""""""""""""
+
+.. py:function:: RK4_solver(fcn, x_0, tspan, tstep)
+
+   Integrate a system of ODEs using 4th-order Runge-Kutta method.
+
+   The ODE function must have the signature:
+
+   .. code-block:: python
+
+      x_dot, y = fcn(t, x)
+
+   where:
+
+   - ``x_dot`` is the state derivative (same shape as x)
+   - ``y`` is the output vector at time t
+
+   :param fcn: ODE function handle f(t, x) -> (x_dot, y)
+   :type fcn: callable
+   :param x_0: Initial state vector (column array, shape (n_states, 1))
+   :type x_0: ulab.numpy.ndarray
+   :param tspan: Time span [t0, tf] for integration
+   :type tspan: list | tuple
+   :param tstep: Integration step size
+   :type tstep: float
+   :return: (tout, yout) where tout is a 1D array of time samples and yout is a 2D array of outputs, shape (len(tout), n_outputs)
+   :rtype: tuple(ulab.numpy.ndarray, ulab.numpy.ndarray)
+
+RK4 Algorithm
+"""""""""""""
+
+The classic 4th-order Runge-Kutta method computes four intermediate slopes per step:
+
+.. math::
+
+   k_1 = f(t_n, x_n)
+
+.. math::
+
+   k_2 = f(t_n + \frac{h}{2}, x_n + \frac{h}{2} k_1)
+
+.. math::
+
+   k_3 = f(t_n + \frac{h}{2}, x_n + \frac{h}{2} k_2)
+
+.. math::
+
+   k_4 = f(t_n + h, x_n + h k_3)
+
+.. math::
+
+   x_{n+1} = x_n + \frac{h}{6}(k_1 + 2k_2 + 2k_3 + k_4)
+
+where :math:`h` is the step size (``tstep``).
+
+Usage Example
+"""""""""""""
+
+.. code-block:: python
+
+   from ulab import numpy as np
+   from defunct_rk4_solver import RK4_solver
+
+   # Define system: x_dot = -0.5 * x (exponential decay)
+   def system_fcn(t, x):
+       x_dot = np.array([[-0.5 * x[0, 0]]])
+       y = x  # Output = state
+       return x_dot, y
+
+   # Initial condition: x(0) = 1.0
+   x_0 = np.array([[1.0]])
+
+   # Integrate from t=0 to t=10 with step size 0.1
+   tout, yout = RK4_solver(system_fcn, x_0, [0, 10], 0.1)
+
+   # yout contains the solution at each time step
+   print(f"Final state: {yout[-1, 0]:.4f}")  # Should be ≈ 0.0067
+
+Observer Integration Example
+"""""""""""""""""""""""""""""
+
+The observer task uses RK4_solver to integrate robot kinematics:
+
+.. code-block:: python
+
+   # Wrapper function for RK4 solver
+   def kinematics_wrapper(t, x_col):
+       '''Wrapper to convert column vector to/from kinematics_fun format'''
+       # Use corrected heading for position integration
+       xd, y = kinematics_fun(t, x_col, omega_L_ms, omega_R_ms, heading_corrected_rad)
+       return xd, y
+
+   # Run RK4 integration for 100ms with 10ms steps
+   tout, yout = RK4_solver(kinematics_wrapper, x, [0, 0.1], 0.01)
+
+   # Extract final state from the last row
+   x = np.array([[yout[-1, i]] for i in range(6)])
+
+RK4 Performance Notes
+"""""""""""""""""""""
+
+- **Memory Efficient**: Designed for ulab's subset of NumPy (MicroPython)
+- **Fixed Step Size**: Uses constant time step (no adaptive step sizing)
+- **Accuracy**: 4th-order method, local truncation error :math:`O(h^5)`
+- **Speed**: Optimized for embedded systems with limited resources
+- **Typical Usage**: 10ms steps over 100ms horizon for observer task
 
 Main (Original)
 ---------------

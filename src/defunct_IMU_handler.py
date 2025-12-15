@@ -1,7 +1,25 @@
-'''
-Handler for BNO055 IMU with calibration persistence
-Implements flowchart: check for calibration.txt -> load or manual calibrate -> run
-'''
+"""
+BNO055 IMU handler tasks for calibration and continuous monitoring.
+
+This module provides cooperative multitasking functions for managing BNO055 IMU
+initialization, calibration persistence, and continuous sensor data reading. The
+calibration task implements a state machine for automatic calibration management,
+while the monitor task provides continuous heading and yaw rate updates.
+
+Tasks:
+    - calibration_task_fun: Manages IMU initialization and calibration workflow
+    - imu_monitor_task_fun: Continuously reads heading and yaw rate from IMU
+
+Hardware:
+    - IMU: BNO055 9-DOF sensor (I2C on B13/B14, reset on B15)
+    - Calibration File: calibration.txt for persistent storage
+
+Notes:
+    - Calibration task runs once at startup to establish IMU calibration
+    - Monitor task produces unwrapped continuous heading (no 0/360 wraparound)
+    - Uses cooperative multitasking with cotask scheduler
+    - Implements automatic calibration file management
+"""
 
 import gc
 import pyb
@@ -13,7 +31,61 @@ from defunct_CalibrationManager import CalibrationManager
 
 
 def calibration_task_fun(shares):
-    '''Task to handle calibration startup routine'''
+    """
+    Cooperative task function implementing IMU calibration state machine.
+
+    Manages the complete IMU initialization and calibration workflow using a
+    6-state finite state machine. Automatically detects existing calibration
+    files, loads calibration if available, or guides the user through manual
+    calibration if needed.
+
+    Args:
+        shares (tuple): Task shares (currently unused, reserved for future use)
+
+    Yields:
+        int: Current state number (0-5)
+
+    State Machine:
+        - S_INIT (0): Initialize BNO055 hardware and reset pin
+        - S_CHECK_FILE (1): Check for existing calibration.txt file
+        - S_LOAD_CALIB (2): Load calibration from file
+        - S_MANUAL_CALIB (3): Manual calibration mode (rotate IMU)
+        - S_SAVE_CALIB (4): Save calibration to file
+        - S_DONE (5): Calibration complete, idle state
+
+    Hardware Setup:
+        - Reset pin B15: Pulsed low then high to reset BNO055
+        - I2C pins B13/B14: Software I2C communication
+        - I2C address: 0x28 (default)
+
+    Calibration Requirements:
+        - System calibration status must reach 3/3
+        - IMU must be rotated in all directions during manual calibration
+        - Calibration data saved to calibration.txt for persistence
+
+    Example Output:
+        >>> # First run (no calibration file)
+        ==================================================
+        === BNO055 Initialization ===
+        ==================================================
+        [OK] BNO055 hardware initialized
+
+        === Checking for Calibration File ===
+        [INFO] calibration.txt not found
+        Manual calibration required (rotate IMU in all directions)
+
+        === Manual Calibration Mode ===
+        Waiting for full calibration (Sys: 3/3)...
+        Rotate the IMU slowly in all directions...
+        [OK] Fully calibrated! (Sys: 3/3)
+
+        === Saving Calibration ===
+        ✓ Calibration saved to calibration.txt
+
+        ==================================================
+        === Calibration Complete - Starting Main Loop ===
+        ==================================================
+    """
     S_INIT = 0
     S_CHECK_FILE = 1
     S_LOAD_CALIB = 2
@@ -110,8 +182,48 @@ def calibration_task_fun(shares):
         yield STATE
 
 def imu_monitor_task_fun(shares):
-    """Task to read and display IMU data after calibration.
-    Produces continuous heading that does NOT wrap at 0/360.
+    """
+    Cooperative task function for continuous IMU data monitoring with heading unwrapping.
+
+    Alternately reads heading and yaw rate from the BNO055 IMU, updating shared
+    variables for navigation and control tasks. Implements heading unwrapping to
+    produce continuous heading values that do not wrap at 0/360 degrees.
+
+    Args:
+        shares (tuple): Task shared variables
+            - shares[0] (Share): IMU object share (BNO055 instance)
+            - shares[1] (Share): Continuous heading output (float, degrees)
+            - shares[2] (Share): Yaw rate output (float, deg/s)
+
+    Yields:
+        None: Yields control to scheduler after each sensor read
+
+    Heading Unwrapping Algorithm:
+        The function maintains a continuous heading by detecting and correcting
+        wraparound at the 0/360 degree boundary:
+
+        1. Read raw heading from IMU (0-360 degrees)
+        2. Calculate delta from previous reading
+        3. Detect wraparound:
+           - If delta > 180: Crossed from 359 to 0 (subtract 360)
+           - If delta < -180: Crossed from 0 to 359 (add 360)
+        4. Add corrected delta to continuous heading
+        5. Update previous heading for next iteration
+
+    Example:
+        >>> # Heading crosses from 359° to 1°
+        >>> # Raw readings: 359, 360, 0, 1, 2
+        >>> # Continuous output: 359, 360, 360, 361, 362
+
+    Timing:
+        - Alternates between heading and yaw rate reads each yield
+        - Typical period: 70ms (14.3 Hz update rate)
+
+    Notes:
+        - Continuous heading can exceed 360° or go negative
+        - Initial heading matches first IMU reading
+        - Yaw rate is read directly without processing
+        - IMU object must be calibrated before this task starts
     """
     imu_share      = shares[0]
     heading_share  = shares[1]   # continuous heading out

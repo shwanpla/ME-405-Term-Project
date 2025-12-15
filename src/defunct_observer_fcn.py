@@ -1,3 +1,40 @@
+"""
+State observer task for robot localization using sensor fusion and RK4 integration.
+
+This module implements a cooperative multitasking observer function that fuses IMU heading
+measurements with encoder velocity data to estimate the robot's global position (X, Y),
+heading, and arc length traveled. Uses 4th-order Runge-Kutta (RK4) numerical integration
+to solve the kinematic equations of motion.
+
+State Vector:
+    x = [X, Y, Theta, s, Omega_L, Omega_R]
+    - X: Global X position (meters)
+    - Y: Global Y position (meters)
+    - Theta: Heading angle (radians)
+    - s: Arc length traveled (meters)
+    - Omega_L: Left wheel velocity (m/s)
+    - Omega_R: Right wheel velocity (m/s)
+
+Sensor Inputs:
+    - IMU heading: Absolute heading measurement (degrees)
+    - IMU yaw rate: Angular velocity measurement (deg/s)
+    - Left encoder speed: Left wheel velocity (ticks/us)
+    - Right encoder speed: Right wheel velocity (ticks/us)
+
+Hardware:
+    - IMU: BNO055 9-DOF sensor for heading measurements
+    - Encoders: Quadrature encoders on both wheels (1437.1 ticks/rev)
+    - Wheel Diameter: 70mm (35mm radius)
+    - Track Width: 141mm
+
+Notes:
+    - Integration uses RK4 solver with 10ms step size over 100ms horizon
+    - IMU heading is low-pass filtered to reduce jitter
+    - Initial heading offset calibration aligns IMU with robot frame
+    - Position outputs are in millimeters, heading in degrees
+    - Velocity scale factor can be tuned to match physical measurements
+"""
+
 import ulab
 from ulab import numpy as np
 from math import pi, cos, sin
@@ -5,10 +42,21 @@ import battery_adc
 from RK4_solver import RK4_solver
 
 def normalize_angle_deg(angle_deg):
-    '''!@brief Normalize angle to [-180, 180] range
-    @param angle_deg Angle in degrees
-    @return Normalized angle in degrees
-    '''
+    """
+    Normalize angle to [-180, 180] degree range.
+
+    Args:
+        angle_deg (float): Angle in degrees (can be any value)
+
+    Returns:
+        float: Normalized angle in degrees within [-180, 180]
+
+    Example:
+        >>> normalize_angle_deg(270.0)
+        -90.0
+        >>> normalize_angle_deg(-190.0)
+        170.0
+    """
     while angle_deg > 180.0:
         angle_deg -= 360.0
     while angle_deg < -180.0:
@@ -16,11 +64,111 @@ def normalize_angle_deg(angle_deg):
     return angle_deg
 
 def observer_task_fcn(shares):
-    '''!@brief Observer task - integrates full kinematic state using RK4
-    Maintains state: [X, Y, Theta, s, Omega_L, Omega_R]
-    Uses IMU heading for heading correction during integration
-    Runs once per motor control update period to stay synchronized
-    '''
+    """
+    Cooperative task function implementing state observer with RK4 integration.
+
+    Fuses IMU heading measurements with encoder velocity data to estimate the robot's
+    global position, heading, and distance traveled. Uses 4th-order Runge-Kutta numerical
+    integration to solve the robot's kinematic equations, providing accurate state
+    estimation for navigation.
+
+    Args:
+        shares (tuple): Task shared variables for sensor inputs and state outputs
+            - meas_heading_share (Share): IMU heading measurement (degrees)
+            - meas_yaw_rate_share (Share): IMU yaw rate measurement (deg/s)
+            - left_enc_pos (Share): Left encoder position (ticks)
+            - right_enc_pos (Share): Right encoder position (ticks)
+            - left_enc_speed (Share): Left encoder velocity (ticks/us)
+            - right_enc_speed (Share): Right encoder velocity (ticks/us)
+            - obs_heading_share (Share): Observer heading output (degrees)
+            - obs_yaw_rate_share (Share): Observer yaw rate output (deg/s)
+            - left_set_point (Share): Left motor control effort
+            - right_set_point (Share): Right motor control effort
+            - observer_calibration_flg (Share): Calibration trigger flag (0 or 1)
+            - big_X_share (Share): Observer X position output (mm)
+            - big_Y_share (Share): Observer Y position output (mm)
+            - initial_heading_share (Share): Initial heading reference (degrees)
+            - end_flg (Share): End flag for debugging output
+
+    Yields:
+        None: Yields control to scheduler after each update cycle
+
+    State Vector (6 states):
+        x = [X, Y, Theta, s, Omega_L, Omega_R]
+        - X: Global X position (meters, converted to mm for output)
+        - Y: Global Y position (meters, converted to mm for output)
+        - Theta: Heading angle (radians, converted to degrees for output)
+        - s: Arc length traveled (meters)
+        - Omega_L: Left wheel velocity (m/s)
+        - Omega_R: Right wheel velocity (m/s)
+
+    Kinematic Model:
+        The observer uses differential drive kinematics:
+
+        .. math::
+            v_{center} = \\frac{v_L + v_R}{2}
+
+        .. math::
+            \\omega_{body} = \\frac{v_R - v_L}{w}
+
+        .. math::
+            \\dot{X} = v_{center} \\cos(\\theta_{IMU})
+
+        .. math::
+            \\dot{Y} = -v_{center} \\sin(\\theta_{IMU})
+
+        .. math::
+            \\dot{\\theta} = \\omega_{body}
+
+        .. math::
+            \\dot{s} = v_{center}
+
+    Calibration Sequence:
+        When observer_calibration_flg == 1:
+
+        1. Read initial IMU heading
+        2. Calculate heading offset to align IMU with robot frame (+X = 0°)
+        3. Initialize position to (100, 800) mm
+        4. Set calibration flag to 0 and enable observer
+
+    IMU Heading Filtering:
+        Low-pass filter applied to reduce heading jitter:
+
+        .. code-block:: python
+
+            heading_filtered = alpha * heading_new + (1 - alpha) * heading_prev
+            # alpha = 0.3 (30% new, 70% previous)
+
+    RK4 Integration:
+        - Integration horizon: 0 to 100ms
+        - Step size: 10ms
+        - Solver: 4th-order Runge-Kutta (RK4_solver)
+
+    Tuning Parameters:
+        - VELOCITY_SCALE = 2.0: Velocity calibration factor
+          - Increase if observer underestimates distance
+          - Decrease if observer overestimates distance
+        - imu_alpha = 0.3: IMU heading low-pass filter coefficient
+          - Lower = smoother but slower response
+          - Higher = faster response but more noise
+
+    Coordinate Frame:
+        - X axis: Forward direction of robot at initialization
+        - Y axis: Right direction of robot at initialization
+        - Theta: Counter-clockwise positive from +X axis
+
+    Example Console Output:
+        >>> IMU heading at startup: -79.63°
+        >>> IMU heading offset (to correct to +X = 0°): 79.63° (1.3895 rad)
+        >>> [FIRST_RUN] Observer initialized at (100, 800) mm pointing +X (0°)
+        >>> X = 567.8 mm, Y = 723.1 mm, Heading = 45.62° (corrected), s = 523.4 mm | v=12.3cm/s
+
+    Notes:
+        - Observer must be calibrated before navigation begins
+        - IMU heading is used directly for X, Y position calculation
+        - Encoder velocities drive heading integration
+        - Position outputs updated every 100ms (observer task period)
+    """
     
     (meas_heading_share, meas_yaw_rate_share, 
     left_enc_pos, right_enc_pos,
