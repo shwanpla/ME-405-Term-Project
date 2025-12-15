@@ -20,9 +20,9 @@ The observer:
 from ulab import numpy as np
 from math import pi, cos, sin
 try:
-    from .RK4_solver import RK4_solver
+    from .defunct_RK4_solver import RK4_solver
 except ImportError:
-    from RK4_solver import RK4_solver
+    from original_approach.defunct_RK4_solver import RK4_solver
 
 
 def normalize_angle_deg(angle_deg):

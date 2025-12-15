@@ -10,10 +10,10 @@ approach. See the Analysis documentation for details.
 """
 # Import main classes for easier discovery by autodoc
 try:
-    from .IMU_driver import BNO055, SoftI2C
-    from .CalibrationManager import CalibrationManager
-    from .observer_fcn import observer
-    from .RK4_solver import RK4
+    from .defunct_IMU_driver import BNO055, SoftI2C
+    from .defunct_CalibrationManager import CalibrationManager
+    from .defunct_observer_fcn import observer
+    from .defunct_RK4_solver import RK4
 except ImportError:
     # Allow graceful failure if imports fail (e.g., during documentation build)
     pass
@@ -21,7 +21,7 @@ except ImportError:
 __all__ = [
     'BNO055',
     'SoftI2C',
-    'CalibrationManager',
+    'defunct_CalibrationManager',
     'observer',
     'RK4',
     'calibration_task_fun',

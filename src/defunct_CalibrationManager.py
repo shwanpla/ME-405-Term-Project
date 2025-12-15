@@ -21,9 +21,9 @@ Notes:
 
 import os
 try:
-    from .IMU_driver import BNO055
+    from .defunct_IMU_driver import BNO055
 except ImportError:
-    from IMU_driver import BNO055
+    from original_approach.defunct_IMU_driver import BNO055
 
 
 class CalibrationManager:

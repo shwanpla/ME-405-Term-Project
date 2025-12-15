@@ -17,11 +17,11 @@ This module provides:
 import pyb
 from pyb import Pin
 try:
-    from .IMU_driver import BNO055
-    from .CalibrationManager import CalibrationManager
+    from .defunct_IMU_driver import BNO055
+    from .defunct_CalibrationManager import CalibrationManager
 except ImportError:
-    from IMU_driver import BNO055
-    from CalibrationManager import CalibrationManager
+    from original_approach.defunct_IMU_driver import BNO055
+    from original_approach.defunct_CalibrationManager import CalibrationManager
 
 
 def calibration_task_fun(shares):

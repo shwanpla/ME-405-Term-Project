@@ -1,14 +1,15 @@
 Original Approach API Reference
 ================================
 
-This page documents the API for the original state-space observer implementation preserved in ``src/original-approach/``. This code was not used in the final system but represents the initial sensor fusion approach combining IMU, encoders, and RK4 numerical integration.
+This page documents the API for the original state-space observer implementation preserved in ``src/`` with the ``defunct_`` prefix. This code was not used in the final system but represents the initial sensor fusion approach combining IMU, encoders, and RK4 numerical integration.
 
 .. note::
    This implementation was replaced by the displacement-based odometry approach documented in :doc:`tasks`. See :doc:`analysis` for the technical rationale behind this decision, including IMU communication issues and the pivot to encoder-only estimation.
+
 IMU Driver
 ----------
 
-.. automodule:: original_approach.IMU_driver
+.. automodule:: defunct_IMU_driver
    :members:
    :undoc-members:
    :show-inheritance:
@@ -16,7 +17,7 @@ IMU Driver
 Calibration Manager
 -------------------
 
-.. automodule:: original_approach.CalibrationManager
+.. automodule:: defunct_CalibrationManager
    :members:
    :undoc-members:
    :show-inheritance:
@@ -24,7 +25,7 @@ Calibration Manager
 IMU Handler Task
 ----------------
 
-.. automodule:: original_approach.IMU_handler
+.. automodule:: defunct_IMU_handler
    :members:
    :undoc-members:
    :show-inheritance:
@@ -55,7 +56,7 @@ Navigation (Original)
 
 Position-based navigation logic using global X, Y coordinates from the observer and IMU heading for state transitions.
 
-.. automodule:: original_approach.navigation_original
+.. automodule:: defunct_navigation
    :members:
    :undoc-members:
    :show-inheritance:
@@ -65,7 +66,7 @@ Main (Original)
 
 Task coordination and cooperative scheduler setup for the original approach.
 
-.. automodule:: original_approach.main_original
+.. automodule:: defunct_main
    :members:
    :undoc-members:
    :show-inheritance:

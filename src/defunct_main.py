@@ -41,15 +41,15 @@ import CL_control_task_V5 as CL_control_task
 from serial_task_V6 import serial_task_fun
 
 try:
-    from .IMU_driver import BNO055
-    from .CalibrationManager import CalibrationManager
-    from .IMU_handler import calibration_task_fun, imu_monitor_task_fun
+    from .defunct_IMU_driver import BNO055
+    from .defunct_CalibrationManager import CalibrationManager
+    from .defunct_IMU_handler import calibration_task_fun, imu_monitor_task_fun
 except ImportError:
-    from IMU_driver import BNO055
-    from CalibrationManager import CalibrationManager
-    from IMU_handler import calibration_task_fun, imu_monitor_task_fun
+    from original_approach.defunct_IMU_driver import BNO055
+    from original_approach.defunct_CalibrationManager import CalibrationManager
+    from original_approach.defunct_IMU_handler import calibration_task_fun, imu_monitor_task_fun
 
-from observer_fcn import observer_task_fcn
+from original_approach.defunct_observer_fcn import observer_task_fcn
 from navigation import navigation_task_fun
 
 
